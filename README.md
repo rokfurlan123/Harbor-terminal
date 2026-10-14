@@ -75,6 +75,21 @@ Mode instructions take effect when a conversation terminal starts or resumes. Cl
 
 These project rules/skills belong to Codex Workspace. Other projects use their own applicable instructions and skills; this update does not create files in every project or change global Codex settings. The testing procedures distinguish fresh-context independent review from code-aware review; installing a skill alone does not schedule or isolate agents.
 
+## Automatic GitHub repositories and commits
+
+When you ask a workspace session to create or implement a project, it is instructed to set up a private GitHub repository when needed, commit completed changes after appropriate checks, and push them. Existing projects retain their intended remote and branch conventions. Discussion does not trigger Git operations, and explicit instructions such as “keep this local” override the default. Changes outside the task are not included in commits.
+
+This workflow applies in Auto, Conversation, and Project work modes. It is agent guidance, not a background Git service: the agent performs the work during your task and reports the repository, commit, and push result. GitHub login and native command approvals remain required. New or reopened conversation terminals load the policy; already running conversations must be reopened when convenient to receive it.
+
+Install GitHub CLI (`gh`) in Linux/WSL and complete the one-time browser login:
+
+```bash
+gh auth login --hostname github.com --git-protocol ssh --web --skip-ssh-key
+gh auth status
+```
+
+`--skip-ssh-key` retains the existing GitHub SSH key setup. If you have no working GitHub SSH key, configure one or use HTTPS instead. Authentication failures leave local work intact and are reported as blockers. Repository names default to the project folder name in the authenticated personal account; name collisions with unrelated repositories require resolution.
+
 ## What persists
 
 Codex owns the conversation history under `$CODEX_HOME` (normally `~/.codex`). The workspace reads and manages this history through the installed Codex app-server protocol; it never edits Codex database tables or copies credentials. Existing CLI, editor, and app-server conversations appear automatically, including conversations started outside this app.

@@ -153,3 +153,12 @@ Added `/home/rokdbest/metronome` as Metronome Pulse in the active workspace and 
 ## 2026-10-14 — GitHub upload preparation
 
 Prepared the existing project for its first Git commit and GitHub upload at user request. Added ignore rules for local credentials, virtual environments, runtime databases, and logs. Source, tests, project instructions, and existing documentation are included. SSH authentication verified for rokfurlan123. Target repository codex-workspace was not found; upload awaits creation of the remote repository. No application behavior changed; application tests were not rerun for repository setup.
+
+
+## 2026-10-14 — Automatic project repositories and commits
+
+User authorized automatic repository creation and commits when asking for project implementation. All three workspace mode policies now instruct agents to create private repositories in the authenticated personal GitHub account when needed, commit scoped completed work after proportionate checks, and push the task branch. Existing remotes/history and unrelated changes are preserved; discussion and explicit local-only requests do not trigger this workflow. Added README setup/behavior documentation and project AGENTS guidance. This is agent policy, not a background Git daemon. Newly started/reopened terminals receive it; live conversations were not restarted.
+
+Installed GitHub CLI 2.102.0 in Linux at /home/rokdbest/tools/github-cli/gh_2.102.0_linux_amd64/bin/gh, linked from /home/rokdbest/.local/bin/gh. Verified the release archive SHA-256 against the official release checksums. Existing SSH authentication identifies rokfurlan123. Browser device authorization is pending; remote repository creation/push cannot complete until login succeeds.
+
+Validation: all seven existing mode tests passed; git diff --check passed. No runtime Python changes or synthetic model turns. Actual GitHub creation/push remains unverified pending user browser login.
