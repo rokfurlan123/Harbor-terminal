@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+.venv/
+*.sqlite
+*.sqlite-*
+*.log
