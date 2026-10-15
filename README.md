@@ -4,6 +4,9 @@ A Linux terminal app with the real Codex conversation on the left and a Trivia /
 
 ## Install on another computer (Linux/WSL)
 
+AI agents: follow [installation and maintenance instructions](docs/INSTALLATION.md)
+for setup, updates, missing-sidebar diagnosis, and package verification.
+
 The complete Trivia / Projects sidebar is included in this repository and Python
 package. Install it on each computer; running plain `codex` does not launch it.
 Requires Python 3.10+, tmux, and an installed, signed-in Codex CLI on the Linux PATH.
