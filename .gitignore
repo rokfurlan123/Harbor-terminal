@@ -9,3 +9,8 @@ __pycache__/
 *.sqlite
 *.sqlite-*
 *.log
+
+# Python package build outputs
+build/
+dist/
+*.egg-info/

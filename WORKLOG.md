@@ -167,3 +167,11 @@ Validation: all seven existing mode tests passed; git diff --check passed. No ru
 ## 2026-10-14 — GitHub login and upload completed
 
 User completed GitHub CLI browser authorization as rokfurlan123. Created private repository https://github.com/rokfurlan123/codex-workspace and successfully pushed main through workflow commit 0261624. Local main now tracks origin/main. GitHub CLI authentication and SSH push both verified with network access. The automatic repository/commit workflow is ready for new or reopened workspace conversations; existing sessions were not restarted.
+
+## 2026-10-15 — Portable installable workspace package
+
+Added setuptools packaging (version 0.1.0), an installed codex-workspace entry point, bundled mode policies, and source archives containing docs, scripts, tests, and project skills. Package imports preserve direct checkout execution. README now covers Linux/WSL prerequisites, pipx installation on another computer, updates, and wheel builds. The optional Windows shortcut helper now uses the default WSL distribution and installed command rather than this machine's username/path; it was not executed and no Windows files were changed. Credentials, conversation history, local preferences, and build outputs are excluded from Git/package runtime contents.
+
+Validation: built wheel and source archive; installed wheel in /tmp/codex-workspace-package-build and ran from /tmp outside the checkout. Verified all three policy files, CLI help, doctor connection, and actual Trivia / Projects sidebar capture with temporary Codex home/data and isolated tmux socket. All 41 tests passed on the final run. Initial sandbox execution could not use sockets; an initial unrestricted run had one timing-sensitive sidebar navigation failure, which passed individually and in the complete rerun. No user conversations were modified and no model prompts were sent. git diff --check passed.
+
+Build tools installed only in the temporary Linux environment: build 1.6.1, setuptools 84.0.0, wheel 0.48.0 (Python 3.12.3). System ensurepip is unavailable here, so this verification environment was bootstrapped with the existing pip --python facility. Documented end-user setup installs python3-venv and pipx normally. Runtime verified with Codex 0.162.1 and tmux 3.4.

@@ -2,7 +2,55 @@
 
 A Linux terminal app with the real Codex conversation on the left and a Trivia / Projects session tree on the right. Uses your installed Codex, its existing login, and its own session storage. No Python packages or API key setup required.
 
-## Run
+## Install on another computer (Linux/WSL)
+
+The complete Trivia / Projects sidebar is included in this repository and Python
+package. Install it on each computer; running plain `codex` does not launch it.
+Requires Python 3.10+, tmux, and an installed, signed-in Codex CLI on the Linux PATH.
+On Ubuntu/WSL, install the packaging prerequisites if needed:
+
+```bash
+sudo apt-get install python3-venv pipx tmux git
+```
+
+Clone this private repository using your GitHub account, then install:
+
+```bash
+git clone git@github.com:rokfurlan123/codex-workspace.git
+cd codex-workspace
+pipx install .
+pipx ensurepath
+```
+
+Open a new Linux/WSL terminal, then run:
+
+```bash
+codex-workspace doctor
+codex-workspace
+```
+
+The installed command includes the sidebar, transport, native-session bridge, and
+all three mode policies. It works outside the checkout and has no Python runtime
+dependencies. Codex and tmux remain separately installed Linux tools. Sign in to
+Codex separately on each computer. Project folders, conversations, credentials,
+and local preferences are not bundled or synced by installing the app.
+
+To update an existing package installation, run `git pull --ff-only` in the
+checkout followed by `pipx install --force .`.
+
+To build a distributable wheel and source archive:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install build
+.venv/bin/python -m build
+```
+
+The files in `dist/` can be copied to another Linux/WSL computer and installed
+with `pipx install /path/to/codex_workspace-0.1.0-py3-none-any.whl`.
+No files in your Windows installation are modified by these commands.
+
+## Run from this checkout
 
 ```bash
 /home/rokdbest/bin/codex-workspace

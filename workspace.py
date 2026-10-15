@@ -934,7 +934,10 @@ def run_conversation(tid, cwd):
     if os.environ.get("TMUX_PANE"):
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_mode", mode)
 
-    from bridge import bridge
+    if __package__:
+        from .bridge import bridge
+    else:
+        from bridge import bridge
     path = DATA / ("tui-" + tid[:12] + ".sock")
     path.unlink(missing_ok=True)
     listener = socket.socket(socket.AF_UNIX)
@@ -1110,7 +1113,10 @@ def main():
     elif args.mode == "focus":
         Workspace().focus()
     elif args.mode == "proxy":
-        from transport import proxy
+        if __package__:
+            from .transport import proxy
+        else:
+            from transport import proxy
         proxy(args.arguments[0])
     elif args.mode == "server":
         path = DATA / "server.sock"
@@ -1143,9 +1149,13 @@ def main():
             rpc.close()
 
 
-if __name__ == "__main__":
+def cli():
     try:
         main()
     except (RuntimeError, OSError) as exc:
         print(f"codex-workspace: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()

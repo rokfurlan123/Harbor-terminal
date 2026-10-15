@@ -1,0 +1,6 @@
+include README.md AGENTS.md WORKLOG.md
+recursive-include policies *.md
+recursive-include docs *.md
+recursive-include scripts *.py
+recursive-include tests *.py
+recursive-include .agents *.md

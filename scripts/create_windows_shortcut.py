@@ -9,13 +9,13 @@ $desktop = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = Join-Path $desktop 'Codex Workspace.lnk'
 $terminal = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\wt.exe'
 if (-not (Test-Path $terminal)) { throw 'Windows Terminal is not installed.' }
-$arguments = '-w new new-tab --title "Codex Workspace" wsl.exe -d Ubuntu --cd /home/rokdbest/codex-workspace --exec bash -lic "exec /home/rokdbest/bin/codex-workspace"'
+$arguments = '-w new new-tab --title "Codex Workspace" wsl.exe --cd ~ --exec bash -lic "exec codex-workspace"'
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $terminal
 $shortcut.Arguments = $arguments
 $shortcut.WorkingDirectory = $env:USERPROFILE
-$shortcut.Description = 'Codex conversations with a saved-session sidebar (Ubuntu WSL)'
+$shortcut.Description = 'Codex conversations with a saved-session sidebar (default WSL distribution)'
 $shortcut.IconLocation = "$env:SystemRoot\System32\wsl.exe,0"
 $shortcut.Save()
 $verified = $shell.CreateShortcut($shortcutPath)
