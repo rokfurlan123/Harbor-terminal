@@ -23,10 +23,27 @@ import fcntl
 from contextlib import contextmanager
 
 ROOT = Path(__file__).resolve().parent
+
+
+def resolve_codex():
+    """Find user installs even when a desktop launcher bypasses shell setup."""
+    configured = os.environ.get("CODEX_WORKSPACE_CODEX")
+    if configured is not None:
+        return configured
+    found = shutil.which("codex")
+    if found:
+        return found
+    for directory in (Path.home() / ".local/bin", Path.home() / "bin"):
+        found = shutil.which(str(directory / "codex"))
+        if found:
+            return found
+    return "codex"
+
+
 DATA = Path(os.environ.get("CODEX_WORKSPACE_DATA", Path.home() / ".local/share/codex-workspace"))
 SOCKET = os.environ.get("CODEX_WORKSPACE_SOCKET", "codex-workspace")
 SESSION = "workspace"
-CODEX = os.environ.get("CODEX_WORKSPACE_CODEX", "codex")
+CODEX = resolve_codex()
 MODES = {"auto": "Auto", "conversation": "Conversation", "project": "Project work"}
 MODE_MARKER = "\n\n[Codex Workspace mode]\n"
 TOPICS = {"misc": "Misc", "misc/tailscale": "Tailscale",

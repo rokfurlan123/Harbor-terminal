@@ -80,6 +80,11 @@ app does not appear. The sidebar also includes **Misc**, with **Tailscale** and
 inside a visible sidebar is different from a missing sidebar: projects come from
 local folders and preferences, as described in README.md.
 
+When a desktop launcher bypasses shell initialization, Workspace also searches
+`~/.local/bin/codex` and `~/bin/codex` if Codex is absent from PATH. For other
+locations set `CODEX_WORKSPACE_CODEX` to the executable's absolute Linux path;
+explicit overrides are honored without fallback. No interactive shell is needed.
+
 For automated checks, use temporary `CODEX_HOME`, `CODEX_WORKSPACE_DATA`,
 `CODEX_WORKSPACE_PROJECTS_ROOT`, and a unique `CODEX_WORKSPACE_SOCKET`. Clear
 inherited `CODEX_WORKSPACE_BASE_DATA` and `CODEX_WORKSPACE_INSTANCE` to avoid

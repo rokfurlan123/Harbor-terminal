@@ -222,3 +222,22 @@ At the user's request, fetched origin and fast-forwarded main from 387e0f9 to e6
 Installed pipx in the Linux user account and installed the complete updated repository with `pipx install --force .`. System apt installation required an unavailable sudo password, so no system Python or Windows toolchain was modified. The former ~/bin launcher was backed up as codex-workspace.pre-update-20261016 and replaced by a link to the pipx entry point; the installed app does not depend on that legacy path. Updated and reread the Windows desktop shortcut to run the installed package through Ubuntu-24.04 directly, with an explicit Linux PATH and no interactive shell (avoids the previously diagnosed plain-Codex autostart interception).
 
 Verification: all 52 upstream tests passed in 7.999s using isolated test data/sockets. Verified installed CLI help, bundled workspace/bridge/transport modules and all mode policies from outside the checkout, plus doctor (Codex 0.163.0, tmux 3.4, zero isolated saved conversations). The installed sidebar smoke check verified Trivia, Projects, new Misc, and model-selection header in a temporary home/data/socket. The first smoke assertion expected the former TRIVIA / PROJECTS header; adjusted the external check to the actual updated labels and reran. Test processes were cleaned up, no model prompts were sent, and existing conversations/login/running workspaces were not interrupted. Fresh launches use the new version; already-running processes retain their loaded code.
+
+## 2026-10-16 — Repair Codex discovery from desktop launches
+
+User reported `Required Linux tool is missing: codex` after opening Workspace.
+Codex 0.163.0 is installed under ~/.local/bin, but launchers can bypass shell PATH
+initialization. Added package-native discovery: retain PATH precedence, then try
+executable ~/.local/bin/codex and ~/bin/codex. Explicit CODEX_WORKSPACE_CODEX
+settings remain authoritative, including invalid paths. Both installed and checkout
+execution use this resolver; no machine-local wrapper or Windows change required.
+
+Validation: 54 tests passed in 7.994s, including two new focused resolver tests.
+Reinstalled with Linux pipx; the first install's sandboxed build-dependency lookup
+failed and the approved network-enabled retry succeeded. Installed doctor and real
+Trivia/Projects/Misc sidebar startup passed from /tmp with PATH=/usr/bin:/bin,
+temporary Codex home/data/projects and a unique tmux socket. Initial smoke fixture
+used a nonexistent CODEX_HOME (corrected); tmux socket access then required an
+approved unrestricted run. Test socket cleaned up; no model prompts, live-session
+changes, Windows modifications, or runtime dependency upgrades. Code-aware review
+only, not independent black-box testing. git diff --check passed.
