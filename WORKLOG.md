@@ -1,5 +1,31 @@
 # Codex Workspace — project notes
 
+## 2026-10-16 — Misc topics alongside Trivia and Projects
+
+- Added peer Misc section with Tailscale and Local models → Qwen. Topic
+  placement overrides displayed project grouping without changing execution
+  folder, history, mode, model, or running conversation. Qwen is a topic label,
+  not an automatic model selection.
+- Added topic-aware new/quick sessions, reuse isolation, search by ancestor
+  labels, parent navigation, and `g`/context-menu placement with original-group
+  restoration. Assignments use the app-owned session_topics table and follow
+  archive/restore, deletion, and native draft-ID handoff.
+- Applied three reviewed assignments across base and 23 existing instance
+  metadata stores, backing up existing databases locally before changes. This
+  conversation is in Tailscale; Create qwen project and Install an always-on
+  Qwen model are in Local models → Qwen. No native Codex storage was edited.
+- Reloaded only the current sidebar and verified other pane identities/statuses
+  were unchanged. Live capture shows Misc (3), Tailscale (1), Local models (2),
+  and Qwen (2). Collapsed Trivia/Projects in the current view to expose Misc.
+- Validation: 52 tests passed, including five topic behavior/persistence tests.
+  Integration suite required execution outside sandbox socket restrictions.
+  Isolated terminal smoke passed at 140×40 and 85×28 with nested topics and Qwen
+  search; screenshots represented by terminal captures under /tmp. No model
+  prompts sent. Reviewed persistence and active-session invariants using the
+  project testing/review skills; review was development-aware, not independent.
+- Runtime launcher uses this checkout. Other already-running sidebar processes
+  load the new UI when reopened; active conversations were not restarted.
+
 ## 2026-09-21 — work resumed; working terminal prototype
 
 - Fixed tmux window allocation (`workspace:` target), catalog transport (the Unix endpoint uses WebSockets, not the stdio proxy protocol), stale-socket readiness, and recovery of crashed support panes.

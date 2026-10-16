@@ -128,6 +128,25 @@ selection and native startup without submitting model prompts.
 
 ## Trivia, projects, and AI modes
 
+The sidebar has three peer sections: **Trivia**, **Projects**, and **Misc**.
+Misc contains **Tailscale** and **Local models → Qwen**. These are conversation
+topics, independent of project folders and the model used to answer a session.
+Putting a conversation under Qwen does not switch its AI model.
+
+Select a topic and press `+` (or click `[+]`) for an Auto-mode session in your
+Linux home folder. `n` lets you name it and choose a mode. An unused session is
+reused only within the same topic. The global blank-session button still starts
+outside topics. Select a conversation and press `g`, or use the right-click
+menu, to move it to Tailscale, Qwen, Local models, or Misc; `r` in that prompt
+restores its original Trivia/Projects grouping. Moving a conversation preserves
+its history, working folder, model, mode, and running terminal.
+
+Topic assignments live in the workspace's `session_topics` metadata table,
+survive archive/restore and native draft-ID binding, and are removed on deletion.
+Search includes ancestor topic names; Left navigates to the immediate parent.
+As with other workspace preferences, assignments belong to each instance;
+new instances inherit the base workspace's assignments.
+
 Click **Start blank session** at the top of the sidebar, or press **F6**, then **b**. This opens an empty Codex prompt, or returns to the existing unused session, without asking for a name, mode, or project. It appears under Trivia as “New session” with an Unsaved status; you can rename it with `e`. Repeated clicks reuse it until you send a message. Closing an unused session discards its placeholder. A newly created blank uses Auto mode and your Linux home folder regardless of the selected project, search, or archived view. Your normal Codex configuration and applicable instructions still apply. Use `n` for the existing guided creation flow.
 
 Trivia is the top-level category for general conversations. Projects groups other sessions by their existing working folder; expand a project to see its sessions. Select Trivia and press `n` for a new general conversation. Select Projects and press `n` to choose a project folder, or select an existing project to reuse its folder. On first setup, the app lists immediate Linux home subfolders that contain a README, Git metadata, or a supported project manifest, including projects with no sessions. To add a folder elsewhere, select Projects and create a session in it; it is remembered thereafter. This is a folder registry, not a recursive scan or a change to project files. Search finds matching names and paths even inside collapsed branches. The archived view uses the same tree. Expansion preferences survive reopening. Top-level headings use cyan, project headings use yellow, and session titles use the normal text color. Each child level adds one column of indentation. App projects show a compact `[sd]` (Software development) tag beneath their names. Project tags are stored separately from AI modes in `preferences.json` under `project_tags`; their folder paths remain available through right-click → Copy project path.

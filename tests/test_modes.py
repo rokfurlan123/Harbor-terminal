@@ -93,5 +93,5 @@ class ModeTests(unittest.TestCase):
         sidebar.prompt.assert_called_once_with('Conversation name')
         with patch.object(sidebar, 'connection') as connection, patch.object(sidebar, 'live_ids', return_value=set()):
             sidebar.submit.call_args.args[0]()
-        connection.return_value.create_or_reuse.assert_called_once_with('Learning', str(Path.home()), 'conversation', set())
+        connection.return_value.create_or_reuse.assert_called_once_with('Learning', str(Path.home()), 'conversation', set(), topic=None)
         self.assertNotIn('project', app.preferences())

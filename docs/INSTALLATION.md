@@ -72,10 +72,11 @@ codex-workspace
 ```
 
 Run the last command in an interactive Linux/WSL terminal, preferably at least
-100 columns wide. Confirm the right sidebar displays **TRIVIA / PROJECTS** with
-Trivia and Projects entries. Plain `codex` opens native Codex without this sidebar.
+100 columns wide. Confirm the right sidebar displays **CODEX WORKSPACE** with
+Trivia, Projects, and Misc entries. Plain `codex` opens native Codex without this sidebar.
 Use `command -v codex-workspace` to identify an obsolete launcher if the expected
-app does not appear. `F6` focuses the sidebar; `r` refreshes it. A missing project
+app does not appear. The sidebar also includes **Misc**, with **Tailscale** and
+**Local models → Qwen**. `F6` focuses the sidebar; `r` refreshes it. A missing project
 inside a visible sidebar is different from a missing sidebar: projects come from
 local folders and preferences, as described in README.md.
 

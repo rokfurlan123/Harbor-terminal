@@ -29,6 +29,24 @@ SESSION = "workspace"
 CODEX = os.environ.get("CODEX_WORKSPACE_CODEX", "codex")
 MODES = {"auto": "Auto", "conversation": "Conversation", "project": "Project work"}
 MODE_MARKER = "\n\n[Codex Workspace mode]\n"
+TOPICS = {"misc": "Misc", "misc/tailscale": "Tailscale",
+          "misc/local-models": "Local models", "misc/local-models/qwen": "Qwen"}
+
+
+def topic_for(thread):
+    topic = thread.get("workspaceTopic")
+    return topic if topic in TOPICS else None
+
+
+def set_session_topic(tid, topic):
+    """Change sidebar placement only; leave native history and execution intact."""
+    if topic is not None and topic not in TOPICS:
+        raise ValueError("Unknown topic")
+    with drafts() as db:
+        if topic is None:
+            db.execute("DELETE FROM session_topics WHERE id = ?", (tid,))
+        else:
+            db.execute("INSERT OR REPLACE INTO session_topics VALUES (?, ?)", (tid, topic))
 
 
 def run(args, **kwargs):
@@ -87,6 +105,7 @@ def drafts():
             db.execute("CREATE TABLE IF NOT EXISTS session_modes (id TEXT PRIMARY KEY, mode TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS session_projects (id TEXT PRIMARY KEY, project TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS session_models (id TEXT PRIMARY KEY, data TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS session_topics (id TEXT PRIMARY KEY, topic TEXT NOT NULL)")
             yield db
     finally:
         db.close()
@@ -300,9 +319,11 @@ class Rpc:
             modes = dict(db.execute("SELECT id, mode FROM session_modes"))
             projects = dict(db.execute("SELECT id, project FROM session_projects"))
             models = dict(db.execute("SELECT id, data FROM session_models"))
+            topics = dict(db.execute("SELECT id, topic FROM session_topics"))
         for item in items:
             item["workspaceMode"] = modes.get(item["id"], "auto")
             item["workspaceModel"] = json.loads(models.get(item["id"], "{}"))
+            item["workspaceTopic"] = topics.get(item["id"])
             if item["id"] in projects:
                 item["workspaceProject"] = projects[item["id"]]
         return sorted(items, key=lambda t: t.get("updatedAt", 0), reverse=True)
@@ -322,13 +343,20 @@ class Rpc:
         thread["workspaceModel"] = model
         return thread
 
-    def create_or_reuse(self, name, cwd, mode, live_ids):
+    def create_or_reuse(self, name, cwd, mode, live_ids, topic=None):
+        if topic is not None and topic not in TOPICS:
+            raise ValueError("Unknown topic")
         for thread in self.threads(live_ids=live_ids):
             if (thread.get("temporary") and thread.get("cwd") == cwd
+                    and topic_for(thread) == topic
                     and thread.get("workspaceModel", {}) == preferences().get("new_session_model", {})
                     and (cwd == str(Path.home()) or thread.get("workspaceMode") == mode)):
                 return thread
-        return self.create(name, cwd, mode, temporary=True)
+        thread = self.create(name, cwd, mode, temporary=True)
+        if topic:
+            set_session_topic(thread["id"], topic)
+            thread["workspaceTopic"] = topic
+        return thread
 
     def change(self, action, tid, name=None):
         params = {"threadId": tid}
@@ -353,6 +381,7 @@ class Rpc:
                 db.execute("DELETE FROM session_modes WHERE id = ?", (tid,))
                 db.execute("DELETE FROM session_projects WHERE id = ?", (tid,))
                 db.execute("DELETE FROM session_models WHERE id = ?", (tid,))
+                db.execute("DELETE FROM session_topics WHERE id = ?", (tid,))
             elif action in ("archive", "unarchive"):
                 db.execute("UPDATE drafts SET archived = ? WHERE id = ?", (action == "archive", tid))
             elif action == "name/set":
@@ -535,29 +564,42 @@ class Sidebar:
 
     def filtered(self):
         q = self.query.casefold()
-        return [t for t in self.items if q in (title(t) + " " + t.get("cwd", "") + " " + (project_for(t) or "") + " " + self.project_names.get(project_for(t), "")).casefold()]
+        def searchable(thread):
+            topic = topic_for(thread)
+            labels = [label for key, label in TOPICS.items()
+                      if topic and (topic == key or topic.startswith(key + "/"))]
+            return " ".join([title(thread), thread.get("cwd", ""), project_for(thread) or "",
+                             self.project_names.get(project_for(thread), ""), *labels]).casefold()
+        return [thread for thread in self.items if q in searchable(thread)]
 
     def selected(self):
         return self.selected_row().get("thread")
 
     def rows(self):
         trivia = []
+        topics = {key: [] for key in TOPICS}
         projects = {cwd: [] for cwd in self.projects if not self.query or self.query.casefold() in (cwd + " " + self.project_names.get(cwd, "")).casefold()}
         for thread in self.filtered():
+            topic = topic_for(thread)
+            if topic:
+                topics[topic].append(thread)
+                continue
             cwd = project_for(thread)
             if cwd is None:
                 trivia.append(thread)
             else:
                 projects.setdefault(cwd, []).append(thread)
         rows = []
-        def group(key, label, depth, cwd=None):
+        def group(key, label, depth, cwd=None, parent=None, topic=None):
             opened = bool(self.query) or key in self.expanded
             rows.append({"key": key, "label": label, "depth": depth, "cwd": cwd, "opened": opened,
-                         "tags": self.project_tags.get(cwd, []) if cwd else []})
+                         "tags": self.project_tags.get(cwd, []) if cwd else [],
+                         "parent": parent or key, "topic": topic})
             return opened
         def leaf(thread, depth, parent):
             rows.append({"key": "session:" + thread["id"], "thread": thread,
                          "label": title(thread), "depth": depth, "parent": parent,
+                         "topic": topic_for(thread),
                          "cwd": project_for(thread) or thread.get("cwd")})
         if group("trivia", f"Trivia ({len(trivia)})", 0):
             for thread in trivia:
@@ -569,9 +611,21 @@ class Sidebar:
                 name = self.project_names.get(cwd) or Path(cwd).name or cwd
                 if names.count(name) > 1:
                     name = cwd
-                if group(key, f"{name} ({len(threads)})", 1, cwd):
+                if group(key, f"{name} ({len(threads)})", 1, cwd, "projects"):
                     for thread in threads:
                         leaf(thread, 2, key)
+        def topic_group(topic):
+            count = sum(len(items) for key, items in topics.items()
+                        if key == topic or key.startswith(topic + "/"))
+            depth = topic.count("/")
+            if group(topic, f"{TOPICS[topic]} ({count})", depth,
+                     parent=topic.rpartition("/")[0] or topic, topic=topic):
+                for thread in topics[topic]:
+                    leaf(thread, depth + 1, topic)
+                for child in TOPICS:
+                    if child.rpartition("/")[0] == topic:
+                        topic_group(child)
+        topic_group("misc")
         return rows
 
     def selected_row(self):
@@ -594,6 +648,9 @@ class Sidebar:
     def select_thread(self, thread):
         cwd = project_for(thread) or str(Path.home())
         self.expanded.update(["trivia", "projects", "project:" + cwd])
+        topic = topic_for(thread)
+        if topic:
+            self.expanded.update(key for key in TOPICS if topic == key or topic.startswith(key + "/"))
         self.index = next((i for i, row in enumerate(self.rows())
                            if row["key"] == "session:" + thread["id"]), 0)
 
@@ -706,6 +763,7 @@ class Sidebar:
                    ("Focus conversation", "\t"), ("Focus sidebar", "sidebar"),
                    ("Start blank session", "b"),
                    ("Change session mode", "m"),
+                   ("Move to Misc topic / restore grouping", "g"),
                    ("Change session model", "M"),
                    ("Model for new sessions", "model:default"),
                    ("Copy session reference", "copy:reference"),
@@ -722,6 +780,8 @@ class Sidebar:
             entries.append(("Model for new sessions", "model:default"))
             if self.selected_row().get("cwd"):
                 entries.append(("Start session in project", "+"))
+            elif self.selected_row().get("topic"):
+                entries.append(("Start session in topic", "+"))
         index = 0
         while True:
             h, w = self.screen.getmaxyx()
@@ -787,7 +847,7 @@ class Sidebar:
             if thread is None:
                 heading_color = curses.color_pair(1 if row["depth"] == 0 else 2)
                 heading = indent + ("▾ " if row["opened"] else "▸ ") + row["label"]
-                if row.get("cwd") and w >= 10:
+                if (row.get("cwd") or row.get("topic")) and w >= 10:
                     heading = heading[:w - 5].ljust(w - 5) + "[+]"
                 self.put(y, heading,
                          attr | curses.A_BOLD | heading_color)
@@ -864,7 +924,7 @@ class Sidebar:
             if 4 <= y < 4 + max(0, (self.screen.getmaxyx()[0] - 14) // 2) * 2 and row < len(self.rows()):
                 self.index = row
                 if buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_RELEASED):
-                    project_button = (self.selected_row().get("cwd") and not self.selected()
+                    project_button = ((self.selected_row().get("cwd") or self.selected_row().get("topic")) and not self.selected()
                                       and (y - 4) % 2 == 0 and self.screen.getmaxyx()[1] >= 10
                                       and self.screen.getmaxyx()[1] - 4 <= x < self.screen.getmaxyx()[1] - 1)
                     self.action("+" if project_button else "\n")
@@ -889,6 +949,11 @@ class Sidebar:
             self.submit(lambda: available_models(self.connection()),
                         lambda catalog: self.apply_model_choice(target, catalog), "Loading models…")
         elif key == "+":
+            topic = self.selected_row().get("topic")
+            if topic:
+                self.submit(lambda: self.connection().create_or_reuse("New session", str(Path.home()), "auto", self.live_ids(), topic=topic),
+                            self.open_created, "Starting topic session…")
+                return
             cwd = self.selected_row().get("cwd")
             if not cwd:
                 self.message = "Select a project first"
@@ -908,6 +973,21 @@ class Sidebar:
                 selected["workspaceMode"] = mode
                 self.select_thread(selected)
                 self.message = "Mode: " + MODES[mode]
+        elif key == "g" and selected:
+            value = self.prompt("Topic: t Tailscale / q Qwen / l Local models / m Misc / r Restore")
+            if value is None:
+                return
+            choices = {"t": "misc/tailscale", "q": "misc/local-models/qwen",
+                       "l": "misc/local-models", "m": "misc", "r": None}
+            if value.lower() not in choices:
+                self.message = "Choose t, q, l, m, or r"
+                return
+            topic = choices[value.lower()]
+            set_session_topic(selected["id"], topic)
+            selected["workspaceTopic"] = topic
+            self.query = ""
+            self.select_thread(selected)
+            self.message = "Moved to " + (TOPICS[topic] if topic else "original grouping")
         elif key in ("\n", "\r", curses.KEY_ENTER):
             if not selected:
                 self.toggle_group()
@@ -924,20 +1004,21 @@ class Sidebar:
             if not name:
                 return
             in_trivia = context["key"] == "trivia" or context.get("parent") == "trivia"
-            mode = self.choose_mode("conversation" if in_trivia else "project")
+            topic = context.get("topic")
+            mode = self.choose_mode("auto" if topic else "conversation" if in_trivia else "project")
             if not mode:
                 return
-            cwd = str(Path.home()) if mode == "conversation" else self.prompt("Project folder (Ctrl-U clears)", context.get("cwd") or preferences().get("project", str(Path.home())))
+            cwd = str(Path.home()) if mode == "conversation" or (topic and mode == "auto") else self.prompt("Project folder (Ctrl-U clears)", context.get("cwd") or preferences().get("project", str(Path.home())))
             if not cwd:
                 return
             path = Path(cwd).expanduser().resolve()
             if not path.is_dir():
                 self.message = "That project folder does not exist"
                 return
-            if mode != "conversation":
+            if mode != "conversation" and not topic:
                 self.projects = sorted(set(self.projects) | {str(path)})
                 save_preferences(project=str(path), projects=self.projects)
-            self.submit(lambda: self.connection().create_or_reuse(name, str(path), mode, self.live_ids()), self.open_created, "Creating conversation…")
+            self.submit(lambda: self.connection().create_or_reuse(name, str(path), mode, self.live_ids(), topic=topic), self.open_created, "Creating conversation…")
         elif key == "c" and selected:
             if any(p["thread"] == selected["id"] for p in self.workspace.panes()):
                 if self.confirm("Close terminal? In-flight work may stop."):
@@ -1118,6 +1199,8 @@ def run_conversation(tid, cwd):
             db.execute("DELETE FROM session_models WHERE id = ?", (tid,))
             db.execute("INSERT OR REPLACE INTO session_projects SELECT ?, project FROM session_projects WHERE id = ?", (thread["id"], tid))
             db.execute("DELETE FROM session_projects WHERE id = ?", (tid,))
+            db.execute("INSERT OR REPLACE INTO session_topics SELECT ?, topic FROM session_topics WHERE id = ?", (thread["id"], tid))
+            db.execute("DELETE FROM session_topics WHERE id = ?", (tid,))
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_thread", thread["id"])
         save_preferences(last_session=thread["id"])
 

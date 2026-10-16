@@ -1,5 +1,20 @@
 # Session organization — 2026-09-22
 
+## Misc additions — 2026-10-16
+
+The following explicit topic placements take precedence over the original
+project/mode grouping. These are app-owned metadata assignments, not edits to
+native history or execution folders. Existing project assignments remain stored
+and can be restored using the topic-placement prompt.
+
+| Topic | Session ID | Conversation |
+| --- | --- | --- |
+| Misc → Tailscale | `01a143b8-332b-7e22-9f25-2fe53ddc3960` | Configure Tailscale remote access |
+| Misc → Local models → Qwen | `01a14389-721f-7011-b001-05fa56f52d19` | Create qwen project |
+| Misc → Local models → Qwen | `01a13ca3-8189-7d92-bf88-f79906be918d` | Install an always-on Qwen model |
+
+## Original project assignments
+
 Reviewed saved conversation user messages and relevant implementation summaries. Assignments use the primary project discussed or developed, rather than the initial title or launch folder. No archived conversations were present. These assignments organize the tree only: original history, working folders, AI modes, and active processes are preserved.
 
 | Project | Session ID | Conversation |

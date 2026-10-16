@@ -48,7 +48,7 @@ class TreeTests(unittest.TestCase):
         self.assertEqual([r['thread']['id'] for r in rows if 'thread' in r], ['work'])
         self.assertTrue(next(r for r in rows if r['key'] == 'project:/tmp/project')['opened'])
         self.side.query = ''
-        self.assertEqual([r['key'] for r in self.side.rows()], ['trivia', 'projects'])
+        self.assertEqual([r['key'] for r in self.side.rows()], ['trivia', 'projects', 'misc'])
 
     def test_refresh_preserves_selected_folder(self):
         self.side.index = next(i for i, r in enumerate(self.side.rows()) if r['key'] == 'projects')
