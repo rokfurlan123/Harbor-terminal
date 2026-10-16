@@ -866,7 +866,7 @@ class Sidebar:
                 if buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_RELEASED):
                     project_button = (self.selected_row().get("cwd") and not self.selected()
                                       and (y - 4) % 2 == 0 and self.screen.getmaxyx()[1] >= 10
-                                      and self.screen.getmaxyx()[1] - 5 <= x < self.screen.getmaxyx()[1] - 2)
+                                      and self.screen.getmaxyx()[1] - 4 <= x < self.screen.getmaxyx()[1] - 1)
                     self.action("+" if project_button else "\n")
             if buttons & (curses.BUTTON3_PRESSED | curses.BUTTON3_CLICKED):
                 self.context_menu()

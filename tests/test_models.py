@@ -61,7 +61,7 @@ class ModelTests(unittest.TestCase):
         side.index = next(i for i, row in enumerate(side.rows()) if row.get('cwd') == self.cwd)
         side.prompt = Mock(side_effect=AssertionError('No setup prompts expected'))
         y = 4 + side.index * 2
-        with patch.object(curses, 'getmouse', return_value=(0, 36, y, 0, curses.BUTTON1_RELEASED)):
+        with patch.object(curses, 'getmouse', return_value=(0, 38, y, 0, curses.BUTTON1_RELEASED)):
             side.action(curses.KEY_MOUSE)
         create, opened = side.submit.call_args.args[:2]
         thread = create()
