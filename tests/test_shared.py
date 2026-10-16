@@ -43,7 +43,8 @@ class SharedTests(unittest.TestCase):
                     def forward():
                         try:
                             bridge(listener, data / 'server.sock', bound.append,
-                                   app.mode_transform('conversation', 'Preserve existing configuration.'))
+                                   app.mode_transform('conversation', 'Preserve existing configuration.',
+                                                      {'provider': 'ollama', 'model': 'qwen3:8b'}))
                         except Exception as exc:
                             failures.append(exc)
                     worker = threading.Thread(target=forward)
@@ -54,6 +55,8 @@ class SharedTests(unittest.TestCase):
                             try:
                                 result = native.call('thread/start', {'cwd': temp})
                                 self.assertEqual(bound[0]['id'], result['thread']['id'])
+                                self.assertEqual(result['model'], 'qwen3:8b')
+                                self.assertEqual(result['modelProvider'], 'ollama')
                             finally:
                                 native.close()
                     finally:

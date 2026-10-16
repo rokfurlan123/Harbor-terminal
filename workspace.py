@@ -86,6 +86,7 @@ def drafts():
             db.execute("CREATE TABLE IF NOT EXISTS drafts (id TEXT PRIMARY KEY, data TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0)")
             db.execute("CREATE TABLE IF NOT EXISTS session_modes (id TEXT PRIMARY KEY, mode TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS session_projects (id TEXT PRIMARY KEY, project TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS session_models (id TEXT PRIMARY KEY, data TEXT NOT NULL)")
             yield db
     finally:
         db.close()
@@ -102,6 +103,46 @@ def set_session_mode(tid, mode):
         raise ValueError("Unknown workspace mode")
     with drafts() as db:
         db.execute("INSERT OR REPLACE INTO session_modes VALUES (?, ?)", (tid, mode))
+
+
+def session_model(tid):
+    with drafts() as db:
+        row = db.execute("SELECT data FROM session_models WHERE id = ?", (tid,)).fetchone()
+    return json.loads(row[0]) if row else {}
+
+
+def set_session_model(tid, model):
+    with drafts() as db:
+        db.execute("INSERT OR REPLACE INTO session_models VALUES (?, ?)", (tid, json.dumps(model)))
+
+
+def model_label(model):
+    return ("Local · " if model.get("provider") == "ollama" else "") + model.get("model", "Codex default")
+
+
+def available_models(rpc):
+    choices = [{}]
+    errors = []
+    try:
+        cursor = None
+        while True:
+            result = rpc.call("model/list", {"cursor": cursor})
+            choices.extend({"provider": "openai", "model": m["model"]} for m in result["data"])
+            cursor = result.get("nextCursor")
+            if not cursor:
+                break
+    except (RuntimeError, OSError) as exc:
+        errors.append("Codex catalog unavailable: " + str(exc))
+    try:
+        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=5)
+        if result.returncode:
+            errors.append("Ollama unavailable; start its service")
+        else:
+            choices.extend({"provider": "ollama", "model": line.split()[0]}
+                           for line in result.stdout.splitlines()[1:] if line.strip())
+    except (OSError, subprocess.TimeoutExpired):
+        errors.append("Ollama unavailable")
+    return choices, "; ".join(errors)
 
 
 def set_session_project(tid, project):
@@ -123,7 +164,7 @@ def project_for(thread):
     return None if mode == "conversation" or (cwd == str(Path.home()) and mode == "auto") else cwd
 
 
-def mode_transform(mode, baseline=""):
+def mode_transform(mode, baseline="", model=None):
     if mode not in MODES:
         raise ValueError("Unknown workspace mode")
     instruction = (ROOT / "policies" / (mode + ".md")).read_text()
@@ -136,6 +177,9 @@ def mode_transform(mode, baseline=""):
             existing = (params.get("config") or {}).get("developer_instructions", baseline)
         existing = (existing or "").split(MODE_MARKER, 1)[0]
         params["developerInstructions"] = existing + MODE_MARKER + instruction
+        if model:
+            params["model"] = model["model"]
+            params["modelProvider"] = model["provider"]
         return request
     return transform
 
@@ -255,8 +299,10 @@ class Rpc:
                     items.append(draft)
             modes = dict(db.execute("SELECT id, mode FROM session_modes"))
             projects = dict(db.execute("SELECT id, project FROM session_projects"))
+            models = dict(db.execute("SELECT id, data FROM session_models"))
         for item in items:
             item["workspaceMode"] = modes.get(item["id"], "auto")
+            item["workspaceModel"] = json.loads(models.get(item["id"], "{}"))
             if item["id"] in projects:
                 item["workspaceProject"] = projects[item["id"]]
         return sorted(items, key=lambda t: t.get("updatedAt", 0), reverse=True)
@@ -271,11 +317,15 @@ class Rpc:
             db.execute("INSERT OR REPLACE INTO drafts (id, data) VALUES (?, ?)",
                        (thread["id"], json.dumps(thread)))
             db.execute("INSERT INTO session_modes VALUES (?, ?)", (thread["id"], mode))
+        model = preferences().get("new_session_model", {})
+        set_session_model(thread["id"], model)
+        thread["workspaceModel"] = model
         return thread
 
     def create_or_reuse(self, name, cwd, mode, live_ids):
         for thread in self.threads(live_ids=live_ids):
             if (thread.get("temporary") and thread.get("cwd") == cwd
+                    and thread.get("workspaceModel", {}) == preferences().get("new_session_model", {})
                     and (cwd == str(Path.home()) or thread.get("workspaceMode") == mode)):
                 return thread
         return self.create(name, cwd, mode, temporary=True)
@@ -302,6 +352,7 @@ class Rpc:
                 db.execute("DELETE FROM drafts WHERE id = ?", (tid,))
                 db.execute("DELETE FROM session_modes WHERE id = ?", (tid,))
                 db.execute("DELETE FROM session_projects WHERE id = ?", (tid,))
+                db.execute("DELETE FROM session_models WHERE id = ?", (tid,))
             elif action in ("archive", "unarchive"):
                 db.execute("UPDATE drafts SET archived = ? WHERE id = ?", (action == "archive", tid))
             elif action == "name/set":
@@ -595,6 +646,56 @@ class Sidebar:
                 return value
             self.message = "Choose a, c, or p"
 
+    def choose_model(self, current, catalog):
+        choices, warning = catalog
+        index = next((i for i, model in enumerate(choices) if model == current), 0)
+        while True:
+            h, w = self.screen.getmaxyx()
+            if h < 7 or w < 16:
+                self.message = "Enlarge terminal to choose a model"
+                return None
+            visible = h - 5
+            offset = max(0, index - visible + 1)
+            self.screen.erase()
+            self.put(0, "CHOOSE MODEL", curses.A_BOLD)
+            for y, model in enumerate(choices[offset:offset + visible], 2):
+                self.put(y, model_label(model), curses.A_REVERSE if y - 2 + offset == index else 0)
+            self.put(h - 2, warning, curses.A_DIM)
+            self.put(h - 1, "↑↓ / click · Enter · Esc cancel", curses.A_DIM)
+            self.screen.refresh()
+            key = self.screen.get_wch()
+            if key in ("\x1b", curses.KEY_RESIZE):
+                return None
+            if key in ("j", curses.KEY_DOWN):
+                index = (index + 1) % len(choices)
+            elif key in ("k", curses.KEY_UP):
+                index = (index - 1) % len(choices)
+            elif key in ("\n", "\r", curses.KEY_ENTER):
+                return choices[index]
+            elif key == curses.KEY_MOUSE:
+                _, _, y, _, buttons = curses.getmouse()
+                if buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_RELEASED) and 2 <= y < 2 + min(visible, len(choices)):
+                    return choices[offset + y - 2]
+
+    def apply_model_choice(self, selected, catalog):
+        current = session_model(selected["id"]) if selected else preferences().get("new_session_model", {})
+        self.screen.timeout(-1)
+        try:
+            model = self.choose_model(current, catalog)
+        finally:
+            self.screen.timeout(200)
+        if model is None:
+            return
+        if selected:
+            if any(p["thread"] == selected["id"] and p["dead"] != "1" for p in self.workspace.panes()):
+                self.message = "Close terminal before changing model"
+                return
+            set_session_model(selected["id"], model or {"default": True})
+            selected["workspaceModel"] = model
+        else:
+            save_preferences(new_session_model=model)
+        self.message = ("Session model: " if selected else "New sessions: ") + model_label(model)
+
     def context_menu(self):
         entries = [("Open conversation", "\n"), ("New conversation", "n"),
                    ("Close terminal", "c"), ("Rename", "e"),
@@ -605,6 +706,8 @@ class Sidebar:
                    ("Focus conversation", "\t"), ("Focus sidebar", "sidebar"),
                    ("Start blank session", "b"),
                    ("Change session mode", "m"),
+                   ("Change session model", "M"),
+                   ("Model for new sessions", "model:default"),
                    ("Copy session reference", "copy:reference"),
                    ("Copy session ID", "copy:id"), ("Copy project path", "copy:path"),
                    ("Copy resume command", "copy:resume")]
@@ -616,6 +719,9 @@ class Sidebar:
             if self.selected_row().get("cwd"):
                 entries.append(("Copy project path", "copy:path"))
             entries.append(("Start blank session", "b"))
+            entries.append(("Model for new sessions", "model:default"))
+            if self.selected_row().get("cwd"):
+                entries.append(("Start session in project", "+"))
         index = 0
         while True:
             h, w = self.screen.getmaxyx()
@@ -655,8 +761,8 @@ class Sidebar:
     def draw(self):
         self.screen.erase()
         h, w = self.screen.getmaxyx()
-        self.put(0, "CODEX WORKSPACE", curses.A_BOLD | curses.color_pair(1))
-        self.put(1, "ARCHIVED" if self.archived else "TRIVIA / PROJECTS", curses.A_DIM)
+        self.put(0, "CODEX WORKSPACE" + (" · ARCHIVED" if self.archived else ""), curses.A_BOLD | curses.color_pair(1))
+        self.put(1, "M Model: " + model_label(preferences().get("new_session_model", {})), curses.A_DIM)
         self.put(2, "/ " + (self.query or "Search conversations"), curses.A_DIM)
         self.put(3, "b  Start blank session", curses.A_BOLD | curses.color_pair(1))
         if time.monotonic() > self.panes_at:
@@ -680,7 +786,10 @@ class Sidebar:
             thread = row.get("thread")
             if thread is None:
                 heading_color = curses.color_pair(1 if row["depth"] == 0 else 2)
-                self.put(y, indent + ("▾ " if row["opened"] else "▸ ") + row["label"],
+                heading = indent + ("▾ " if row["opened"] else "▸ ") + row["label"]
+                if row.get("cwd") and w >= 10:
+                    heading = heading[:w - 5].ljust(w - 5) + "[+]"
+                self.put(y, heading,
                          attr | curses.A_BOLD | heading_color)
                 if row.get("cwd"):
                     detail = " ".join("[" + ("sd" if tag == "Software development" else tag) + "]" for tag in row["tags"]) if row["tags"] else row["cwd"]
@@ -704,14 +813,15 @@ class Sidebar:
             mode = MODES.get(thread.get("workspaceMode", "auto"), "Auto")
             if pane and pane["dead"] != "1" and not pane.get("mode"):
                 mode = "Reopen: " + mode
-            self.put(y + 1, indent + f"{mode} · {status}", curses.A_DIM)
-        if self.query and not self.filtered():
+            label = model_label(thread["workspaceModel"]) if thread.get("workspaceModel") else ""
+            self.put(y + 1, indent + f"{mode} · {status}" + (" · " + label if label else ""), curses.A_DIM)
+        if self.query and not self.filtered() and not any(row.get("cwd") for row in items):
             self.put(4, "No matching conversations", curses.A_DIM)
         self.put(h - 10, self.message, curses.color_pair(1))
-        self.put(h - 8, "Enter Open/fold   n New")
+        self.put(h - 8, "Enter Open/fold  + Quick new")
         self.put(h - 7, "c Close       e Rename")
         self.put(h - 6, "a Archive    m Mode")
-        self.put(h - 5, "v Saved / archived")
+        self.put(h - 5, "v Saved/archive  M Model")
         self.put(h - 4, "/ Search      r Refresh")
         self.put(h - 3, "D Delete      q Detach")
         self.put(h - 2, "Right-click: menu / copy", curses.A_DIM)
@@ -743,7 +853,10 @@ class Sidebar:
         elif key == "q":
             tmux("detach-client", "-s", SESSION)
         elif key == curses.KEY_MOUSE:
-            _, _, y, _, buttons = curses.getmouse()
+            _, x, y, _, buttons = curses.getmouse()
+            if y == 1 and buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_RELEASED):
+                self.action("model:default")
+                return
             if y == 3 and buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_RELEASED):
                 self.action("b")
                 return
@@ -751,7 +864,10 @@ class Sidebar:
             if 4 <= y < 4 + max(0, (self.screen.getmaxyx()[0] - 14) // 2) * 2 and row < len(self.rows()):
                 self.index = row
                 if buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_RELEASED):
-                    self.action("\n")
+                    project_button = (self.selected_row().get("cwd") and not self.selected()
+                                      and (y - 4) % 2 == 0 and self.screen.getmaxyx()[1] >= 10
+                                      and self.screen.getmaxyx()[1] - 5 <= x < self.screen.getmaxyx()[1] - 2)
+                    self.action("+" if project_button else "\n")
             if buttons & (curses.BUTTON3_PRESSED | curses.BUTTON3_CLICKED):
                 self.context_menu()
         elif isinstance(key, str) and key.startswith("copy:"):
@@ -765,6 +881,23 @@ class Sidebar:
                 self.message = "Select a conversation first"
         elif self.future:
             return
+        elif key in ("M", "model:default"):
+            target = selected if key == "M" else None
+            if target and any(p["thread"] == target["id"] and p["dead"] != "1" for p in self.workspace.panes()):
+                self.message = "Close terminal before changing model"
+                return
+            self.submit(lambda: available_models(self.connection()),
+                        lambda catalog: self.apply_model_choice(target, catalog), "Loading models…")
+        elif key == "+":
+            cwd = self.selected_row().get("cwd")
+            if not cwd:
+                self.message = "Select a project first"
+                return
+            if not Path(cwd).is_dir():
+                self.message = "That project folder does not exist"
+                return
+            self.submit(lambda: self.connection().create_or_reuse("New session", cwd, "project", self.live_ids()),
+                        self.open_created, "Starting project session…")
         elif key == "m" and selected:
             if any(p["thread"] == selected["id"] and p["dead"] != "1" for p in self.workspace.panes()):
                 self.message = "Close terminal before changing mode"
@@ -925,12 +1058,22 @@ def run_conversation(tid, cwd):
     endpoint = DATA / "server.sock"
     is_new = bool(draft and not Path(draft.get("path") or "/nonexistent").exists())
     mode = session_mode(tid)
+    model = session_model(tid)
     rpc = Rpc()
     try:
-        baseline = rpc.call("config/read", {"cwd": cwd, "includeLayers": False})["config"].get("developer_instructions", "")
+        config = rpc.call("config/read", {"cwd": cwd, "includeLayers": False})["config"]
+        baseline = config.get("developer_instructions", "")
+        if model.get("default"):
+            default_model = config.get("model")
+            if not default_model:
+                catalog = rpc.call("model/list", {})["data"]
+                default_model = next((m["model"] for m in catalog if m.get("isDefault")), None)
+            if not default_model:
+                raise RuntimeError("No configured default model; choose a model explicitly")
+            model = {"model": default_model, "provider": config.get("model_provider") or "openai"}
     finally:
         rpc.close()
-    transform = mode_transform(mode, baseline)
+    transform = mode_transform(mode, baseline, model)
     if os.environ.get("TMUX_PANE"):
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_mode", mode)
 
@@ -971,6 +1114,8 @@ def run_conversation(tid, cwd):
             db.execute("DELETE FROM drafts WHERE id = ?", (tid,))
             db.execute("INSERT OR REPLACE INTO session_modes VALUES (?, ?)", (thread["id"], mode))
             db.execute("DELETE FROM session_modes WHERE id = ?", (tid,))
+            db.execute("INSERT OR REPLACE INTO session_models SELECT ?, data FROM session_models WHERE id = ?", (thread["id"], tid))
+            db.execute("DELETE FROM session_models WHERE id = ?", (tid,))
             db.execute("INSERT OR REPLACE INTO session_projects SELECT ?, project FROM session_projects WHERE id = ?", (thread["id"], tid))
             db.execute("DELETE FROM session_projects WHERE id = ?", (tid,))
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_thread", thread["id"])

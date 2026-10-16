@@ -81,6 +81,8 @@ New instance settings live under `~/.local/share/codex-workspace/instances/<name
 | Right-click in sidebar | Select the clicked session and show all actions plus copy options |
 | b / Click Start blank session | Immediately open a fresh session in your Linux home folder, using Auto mode |
 | n | New conversation under the selected category/project; choose mode and, when relevant, project folder |
+| + / Click [+] beside a project | Start a session directly in that project, without setup prompts |
+| M | Choose the selected closed session’s model; on a folder, choose the default for new sessions |
 | m | Change a closed session's mode (also in the right-click menu) |
 | c | Close its terminal after confirmation; retain saved history |
 | e | Rename the saved conversation |
@@ -94,6 +96,35 @@ New instance settings live under `~/.local/share/codex-workspace/instances/<name
 In text prompts, Ctrl-U clears the field and Escape cancels. Codex's own shortcuts and approval interface remain available in the conversation pane. For terminal copy/paste, Shift bypasses tmux mouse handling in many terminals.
 
 The right-click menu includes every footer action and copies the selected session's reference (name, ID, project), ID alone, project path, or a shell-quoted Linux resume command. Drafts need saved history before a resume command is available. Copy uses tmux's terminal clipboard integration (OSC 52), supported by Windows Terminal; other terminals may require clipboard permission. Use arrows and Enter or click an item; Escape dismisses the menu. Short terminals scroll the menu with the arrow keys or mouse wheel. Close and delete retain their confirmation prompts.
+
+## Models and quick project sessions
+
+Click `[+]` at the right edge of a project heading, or select the project and
+press `+`, to open a new session directly in its folder using Project work mode.
+There are no name or folder prompts. An open unused session with the same folder,
+mode, and model is reused. Once it has messages, another click creates a fresh
+session. This also works for projects with no saved conversations.
+
+Click the **M Model** line at the top of the sidebar to choose the model for new
+sessions. Use arrows and Enter or click a model; Escape cancels. The picker lists
+the Codex model catalog and models installed in Ollama, including local Qwen.
+The default is remembered per workspace instance and applies to blank, quick
+project, and guided new sessions. Catalog entries do not guarantee account access.
+Ollama must be installed and running for local discovery and execution; models
+are not downloaded automatically.
+
+To change an existing conversation, close its terminal with `c`, select it, press
+`M` (or right-click → Change session model), then reopen it. Its saved history is
+retained. Open terminals are never restarted by the picker. **Codex default**
+restores the configured model/provider on next launch. Explicit model choices
+appear beside the session status; these are launch preferences, not live telemetry
+of changes made through native Codex controls. The right-click menu also lets you
+change the default for new sessions while a conversation is selected.
+
+Model selection uses native app-server start/resume fields, keeping the Codex
+approval interface and history. Local model response quality and tool support
+depend on the installed model and Ollama version. Integration checks verify
+selection and native startup without submitting model prompts.
 
 ## Trivia, projects, and AI modes
 
