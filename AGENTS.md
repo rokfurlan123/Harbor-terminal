@@ -11,3 +11,5 @@ Project testing skills are .agents/skills/black-box-test/SKILL.md and .agents/sk
 For authorized implementation work on this project, follow the Automatic GitHub workflow in policies/project.md: private repository setup when needed, scoped commits after checks, and pushes are authorized by default.
 
 For installation, updates, packaging, another-computer setup, or a missing Trivia / Projects sidebar, read docs/INSTALLATION.md first and carry out the applicable steps. The sidebar belongs to this custom app, launched with `harbor` (`codex-workspace` remains an alias), not plain `codex`. Keep the complete app installable from this repository; do not rely on `/home/rokdbest/bin` or other machine-local launchers. Preserve both installed-package and direct-checkout execution. Include all runtime modules and mode policies when packaging. Record setup/verification results in WORKLOG.md and push authorized project changes to the existing remote.
+
+For Tailscale model connections, follow docs/TAILSCALE.md. Keep device discovery, authenticated SSH, endpoint checks, and saved selection separate; never claim source-side success from destination-only tests.

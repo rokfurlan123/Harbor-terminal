@@ -21,6 +21,7 @@ import textwrap
 import uuid
 import signal
 import fcntl
+import getpass
 from contextlib import contextmanager
 
 if __package__:
@@ -895,17 +896,41 @@ class Sidebar:
         store = connection_store()
         names = ['local'] + [p['id'] for p in store.all()]
         self.message = 'Connections: ' + ', '.join(names)
-        action = self.prompt('a Add / t List models / l Load / u Unload / p Download / d Remove')
+        action = self.prompt('s Setup Tailscale / a Add / t List / l Load / u Unload / p Download / d Remove')
         if not action:
             return
         name = self.prompt('Connection ID [' + ', '.join(names) + ']')
         if not name:
             return
-        if action == 'a':
-            kind = self.prompt('Type: ollama / ssh / responses')
+        if action in ('a', 's'):
+            kind = 'tailscale' if action == 's' else self.prompt('Type: tailscale / ollama / ssh / responses')
             if kind is None:
                 return
             profile = {'id': name, 'kind': kind}
+            if kind == 'tailscale':
+                host = self.prompt('Tailscale computer name or IP')
+                if not host:
+                    return
+                username = self.prompt('Linux username [' + getpass.getuser() + ']')
+                if username is None:
+                    return
+                port = self.prompt('Remote Ollama port [11434]')
+                if port is None:
+                    return
+                model = self.prompt('Model for new sessions [leave empty to choose with M]')
+                if model is None:
+                    return
+                replace = name in names
+                if replace and not self.confirm('Replace connection ' + name + '?'):
+                    return
+                def configured(result):
+                    if result['model']:
+                        save_preferences(new_session_model={'provider': 'harbor_'+name, 'connection': name, 'model': result['model']})
+                    self.message = 'Connected: '+name+' · '+', '.join(result['models'])+'. M selects a model.'
+                self.submit(lambda: connections.setup_tailscale(store, name, (username or getpass.getuser())+'@'+host,
+                            int(port or '11434'), model or None, replace=replace), configured,
+                            'Checking Tailscale → SSH → models…')
+                return
             if kind == 'ssh':
                 target = self.prompt('SSH target user@hostname')
                 if target is None:
@@ -948,7 +973,7 @@ class Sidebar:
             self.submit(lambda: connection_operation(name, operation, model),
                         lambda message: setattr(self, 'message', message), operation.title() + ' on ' + name + '…')
         else:
-            self.message = 'Choose a, t, l, u, p, or d.'
+            self.message = 'Choose s, a, t, l, u, p, or d.'
 
     def apply_model_choice(self, selected, catalog):
         current = session_model(selected["id"]) if selected else preferences().get("new_session_model", {})
@@ -1570,14 +1595,24 @@ def model_cli(argv):
     sub = parser.add_subparsers(dest='action', required=True)
     if argv[0] == 'connections':
         sub.add_parser('list', help='List saved connection profiles (no secrets)')
+        sub.add_parser('devices', help='List computers in this Linux Tailscale connection')
+        setup = sub.add_parser('setup', help='Guided Tailscale SSH model connection; test before saving')
+        setup.add_argument('name', nargs='?')
+        setup.add_argument('--host', help='Tailscale device name, full DNS name, or IP')
+        setup.add_argument('--user', help='Linux username on that computer')
+        setup.add_argument('--remote-port', type=int, help='Remote loopback Ollama port (default 11434)')
+        setup.add_argument('--model', help='Optional model to use for new sessions after verification')
+        setup.add_argument('--tailscale-socket', help='Optional custom Linux tailscaled socket')
+        setup.add_argument('--replace', action='store_true')
         add = sub.add_parser('add', help='Add or explicitly replace a named connection')
         add.add_argument('name')
-        add.add_argument('--kind', choices=['ollama', 'ssh', 'responses'], required=True)
+        add.add_argument('--kind', choices=['tailscale', 'ollama', 'ssh', 'responses'], required=True)
         add.add_argument('--url')
         add.add_argument('--ssh')
         add.add_argument('--remote-port', type=int, default=11434)
         add.add_argument('--key-env', help='Environment variable NAME, never the key itself')
         add.add_argument('--models', nargs='*', default=[])
+        add.add_argument('--tailscale-socket')
         add.add_argument('--replace', action='store_true')
         for action in ('remove', 'test'):
             sub.add_parser(action).add_argument('name')
@@ -1591,13 +1626,37 @@ def model_cli(argv):
     args = parser.parse_args(argv[1:])
     store = connection_store()
     if argv[0] == 'connections':
-        if args.action == 'list':
+        if args.action == 'devices':
+            for device in connections.tailscale_support.devices():
+                print(device['name'], ','.join(device['addresses']), device['os'], 'online' if device['online'] else 'offline')
+        elif args.action == 'setup':
+            interactive = sys.stdin.isatty()
+            name = args.name or (input('Connection name: ').strip() if interactive else None)
+            host = args.host or (input('Tailscale computer name or IP: ').strip() if interactive else None)
+            username = args.user or ((input('Linux username ['+getpass.getuser()+']: ').strip() or getpass.getuser()) if interactive else None)
+            if not name or not host or not username:
+                raise ValueError('Provide connection name, --host and --user, or run harbor connections setup in a terminal.')
+            port = args.remote_port
+            model = args.model
+            if interactive and port is None:
+                port = int(input('Remote Ollama port [11434]: ').strip() or '11434')
+            if interactive and model is None:
+                model = input('Model for new sessions [choose later]: ').strip() or None
+            result = connections.setup_tailscale(store, name, username+'@'+host, 11434 if port is None else port, model,
+                                                 args.tailscale_socket, args.replace)
+            if result['model']:
+                save_preferences(new_session_model={'provider': 'harbor_'+name, 'connection': name, 'model': result['model']})
+            print('Tailscale → SSH → Ollama verified. Connection saved:', name)
+            print('Available models:', ', '.join(result['models']))
+            if result['model']:
+                print('New sessions:', name+' · '+result['model'])
+        elif args.action == 'list':
             print(json.dumps([store.get('local'), *store.all()], indent=2))
         elif args.action == 'add':
             if any(p['id'] == args.name for p in store.all()) and not args.replace:
                 raise ValueError('Connection exists; use --replace to change it.')
             profile = {k: v for k, v in vars(args).items()
-                       if k in ('kind', 'url', 'ssh', 'remote_port', 'key_env', 'models') and v is not None}
+                       if k in ('kind', 'url', 'ssh', 'remote_port', 'key_env', 'models', 'tailscale_socket') and v is not None}
             store.change(args.name, dict(profile, id=args.name))
             print('Connection saved:', args.name)
         elif args.action == 'remove':

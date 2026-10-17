@@ -483,3 +483,67 @@ the successful check used 256 tokens. This verifies endpoint communication, not
 a full native TUI conversation/reopen test. No live conversations were modified
 or restarted. F5/top-bar Model lets the user select a model in a separate child;
 no global default was changed by this verification.
+
+## 2026-10-17 — Reusable guided Tailscale model connections (Harbor 0.2.1)
+
+The user requested that Harbor remember the proven Tailscale/SSH workflow and
+connect from entered machine/model data, beginning with Tailscale only. Added
+**C → s Setup Tailscale** and `harbor connections setup`, plus device discovery
+with `harbor connections devices`. Fields are connection name, Tailscale host,
+Linux username, remote Ollama loopback port (11434 default), and an optional
+model for new sessions. Existing generic SSH/direct/Responses profiles remain
+compatible. This first guided transport works with any installed Ollama model;
+it is not a multiple-agent task router or a new arbitrary-API adapter.
+
+The connector discovers the authenticated Linux tailnet, resolves exactly one
+online peer, invokes the supported `tailscale ssh` wrapper for coordination-
+verified host keys and userspace routing, owns a loopback-only ephemeral SSH
+forward, verifies the model catalog/name, then saves. It detects a running
+same-user userspace daemon socket without a machine-specific Local AI path;
+explicit CLI/socket overrides remain available. No manual SSH alias, temporary
+browser URL, first-use host-key acceptance, or fixed local model port is needed.
+Profiles remain private runtime JSON. Setup failures leave existing profiles
+and defaults intact; replacement is rechecked under the store lock to prevent
+a concurrent setup from overwriting an unconfirmed connection. Failures report
+whether device availability, SSH policy/login/host identity, endpoint, or model
+needs attention. SSH directionality is explained explicitly. No tailnet policy
+changes, credential copying, public listeners, or implicit model downloads occur.
+
+Stored the workflow and current verified topology in docs/TAILSCALE.md, linked
+it from AGENTS.md/README/installation docs, and bumped the package to 0.2.1.
+Tailscale login, destination Tailscale SSH, and an administrator-approved network
+and SSH rule are prerequisites; Harbor cannot grant itself those permissions.
+Running conversations retain their models, permissions, identity, and history.
+
+Validation:
+
+- **86 tests passed** in 26.314 seconds. New acceptance scenarios cover CLI
+  setup/reopen, a real owned fixture tunnel, device lookup, unknown/offline and
+  signed-out peers, invalid targets/ports, ambiguous names, custom sockets,
+  missing CLI, SSH-policy direction, model/catalog failure, explicit and racing
+  replacement, model selection, and setup cancellation. Real isolated sidebar
+  key flows exercise C → s, cancellation, and successful asynchronous setup.
+- Applied the project black-box-test and change-review skill perspectives.
+  The same implementation-aware agent performed behavioral checks and code
+  review; no blind/independent review is claimed. Review found and fixed the
+  zero-port CLI default issue and concurrent unconfirmed-profile replacement.
+- Built wheel and source archive using the existing Linux build environment.
+  Wheel includes tailscale_support.py and all runtime modules/mode policies;
+  source archive includes the recipe, instructions, tests, and skills. An
+  isolated installed-wheel check from outside the checkout passed help, doctor,
+  model discovery/selection, and the Connections sidebar. No live history was
+  used as a fixture. Syntax and Git whitespace checks passed.
+- Installed Harbor 0.2.1 into the laptop's existing harbor-app venv and the
+  PC's existing pipx Harbor environment, without restarting conversation panes.
+  On **strawberry itself**, the installed app successfully ran guided setup for
+  `laptop` → `rokdbest@strawberry-laptop-linux` and selected local-qwen:latest.
+  Test and model listing returned local-qwen:latest and qwen3:8b through the
+  new managed Tailscale connector, not the separate manually launched tunnel.
+- Actual source-PC native inference used a temporary CODEX_HOME/data/tmux socket
+  and an invalid synthetic onboarding credential, with no real credentials
+  copied. Harbor reached laptop Qwen through managed Tailscale SSH, saved the
+  agent reply `HARBOR_OK`, and reopened that disposable conversation with the
+  selected connection and history. Only the isolated test server was stopped.
+- Pulled seven incoming PC commits before implementation, preserving the
+  existing model toolbar, pending-model preferences, and installation history.
+  No Windows files, launchers, or toolchains were changed.

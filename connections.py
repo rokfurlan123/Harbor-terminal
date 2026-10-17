@@ -8,10 +8,16 @@ from pathlib import Path
 import re
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+if __package__:
+    from . import tailscale_support
+else:
+    import tailscale_support
 
 
 def validate(profile):
@@ -22,12 +28,16 @@ def validate(profile):
     if name == 'local':
         raise ValueError('local is reserved for this computer’s Ollama.')
     kind = profile.get('kind')
-    if kind not in ('ollama', 'ssh', 'responses'):
-        raise ValueError('Choose ollama, ssh, or responses.')
-    allowed = {'id', 'kind', 'url', 'ssh', 'remote_port', 'key_env', 'models'}
+    if kind not in ('ollama', 'ssh', 'tailscale', 'responses'):
+        raise ValueError('Choose tailscale, ollama, ssh, or responses.')
+    allowed = {'id', 'kind', 'url', 'ssh', 'remote_port', 'key_env', 'models', 'tailscale_socket'}
     if set(profile) - allowed:
         raise ValueError('Unsupported connection fields; never store credentials in a profile.')
-    if kind == 'ssh':
+    if profile.get('tailscale_socket'):
+        value = profile['tailscale_socket']
+        if kind != 'tailscale' or not isinstance(value, str) or not Path(value).is_absolute() or any(ord(c)<32 for c in value):
+            raise ValueError('Tailscale socket must be an absolute Linux path on a tailscale connection.')
+    if kind in ('ssh', 'tailscale'):
         if not re.fullmatch(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*', profile.get('ssh', '')):
             raise ValueError('SSH target must be user@hostname or user@IPv4; use SSH config for custom ports/keys.')
         port = int(profile.get('remote_port', 11434))
@@ -90,7 +100,7 @@ class Store:
                 return profile
         raise RuntimeError('Connection not found: ' + name + '. Re-add it or choose another model.')
 
-    def change(self, name, profile=None):
+    def change(self, name, profile=None, replace=True):
         if name == 'local':
             raise ValueError('The built-in local connection cannot be replaced or removed.')
         checked = validate(profile) if profile is not None else None
@@ -99,7 +109,10 @@ class Store:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         with (self.directory / 'connections.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            profiles = [p for p in self.all() if p['id'] != name]
+            current = self.all()
+            if checked and not replace and any(p['id'] == name for p in current):
+                raise ValueError('Connection exists; confirm replacement before changing it.')
+            profiles = [p for p in current if p['id'] != name]
             if checked:
                 profiles.append(checked)
             tmp = self.path.with_suffix('.tmp')
@@ -205,27 +218,60 @@ class Endpoint:
 
 
 def ssh_command(profile, port):
-    return ['ssh', '-N', '-T', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes',
+    options = ['-N', '-T', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes',
             '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10',
             '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
-            '-L', f'127.0.0.1:{port}:127.0.0.1:{profile["remote_port"]}', '--', profile['ssh']]
+            '-L', f'127.0.0.1:{port}:127.0.0.1:{profile["remote_port"]}']
+    if profile['kind'] == 'tailscale':
+        return tailscale_support.prepare(profile) + options
+    return ['ssh', *options, '--', profile['ssh']]
+
+
+def setup_tailscale(store, name, target, remote_port=11434, model=None, socket_path=None, replace=False):
+    """Save only after discovery, authenticated forwarding and model checks pass."""
+    if any(p['id'] == name for p in store.all()) and not replace:
+        raise ValueError('Connection exists; use --replace or confirm replacement in Harbor.')
+    profile = {'id': name, 'kind': 'tailscale', 'ssh': target, 'remote_port': remote_port}
+    if socket_path:
+        profile['tailscale_socket'] = socket_path
+    profile = validate(profile)
+    with connect(profile) as endpoint:
+        try:
+            models = endpoint.models()
+        except RuntimeError as exc:
+            raise RuntimeError('Tailscale SSH connected, but the remote Ollama API on loopback port '+str(profile['remote_port'])+
+                               ' could not be verified. Start Ollama on that computer or correct the port. '+str(exc)) from None
+        if not models:
+            raise RuntimeError('Connected to Ollama, but it has no installed models. Install a model on the destination, then retry.')
+        canonical = endpoint.resolve_model(model) if model else None
+    store.change(name, profile, replace=replace)
+    return {'id': name, 'models': models, 'model': canonical}
 
 
 @contextmanager
 def connect(profile):
-    if profile['kind'] != 'ssh':
+    if profile['kind'] not in ('ssh', 'tailscale'):
         yield Endpoint(profile, profile['url'])
         return
     # Loopback-only, per-operation forwarding. Never daemonize an orphan tunnel.
     with socket.socket() as reserve:
         reserve.bind(('127.0.0.1', 0))
         port = reserve.getsockname()[1]
-    process = subprocess.Popen(ssh_command(profile, port), stdin=subprocess.DEVNULL,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    command = ssh_command(profile, port)
+    errors = tempfile.TemporaryFile()
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL, stderr=errors)
+    except OSError:
+        errors.close()
+        raise RuntimeError('SSH executable not found or could not start. Install OpenSSH in Linux/WSL.') from None
     try:
         deadline = time.monotonic() + 12
         while True:
             if process.poll() is not None:
+                if profile['kind'] == 'tailscale':
+                    errors.seek(0)
+                    raise RuntimeError(tailscale_support.failure(profile, errors.read(16000).decode(errors='replace')))
                 raise RuntimeError('SSH connection failed. Verify host key, login and forwarding with ssh ' + profile['ssh'] + '.')
             try:
                 with socket.create_connection(('127.0.0.1', port), timeout=.2):
@@ -243,3 +289,4 @@ def connect(profile):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+        errors.close()

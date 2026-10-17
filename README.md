@@ -151,13 +151,20 @@ selection and native startup without submitting model prompts.
 ## Model connections and remote Qwen
 
 Press **C** in the sidebar or choose **Connections / manage models** in the
-right-click menu. Add a connection, list its models, and select one with **M**.
+right-click menu. Choose **s Setup Tailscale**, enter a connection name, computer, Linux username,
+Ollama port (default 11434), and optionally a model. Harbor finds the authenticated
+Tailscale device, verifies SSH and the model catalog, then saves the connection.
+Entering a model also selects it for new sessions. Leave it empty to choose with
+**M**. Existing running conversations remain untouched.
 The connection ID appears beside the model so two servers with the same model
 name are distinguishable. Switching a saved conversation requires closing its
 terminal first; running conversations and their tunnels are not changed.
 
 Supported connections:
 
+- **Tailscale SSH**: guided device lookup, coordination-verified SSH host keys,
+  automatic userspace routing and managed loopback model tunnels. No manual SSH
+  alias or first-login host-key acceptance is required for Tailscale SSH servers.
 - **Local Ollama**: automatically discovered; built-in connection ID `local`.
 - **Ollama over SSH**: authenticated forwarding to the other machine's loopback
   port. Harbor opens and closes the tunnel with the operation or conversation.
@@ -168,20 +175,21 @@ Supported connections:
 Examples (run on the PC that will use the remote model):
 
 ```bash
-# First verify SSH host identity and login normally.
-ssh rokdbest@100.124.226.26 true
-harbor connections add laptop --kind ssh --ssh rokdbest@100.124.226.26
+harbor connections devices
+harbor connections setup laptop --host strawberry-laptop-linux --user rokdbest --model local-qwen
 harbor connections test laptop
 harbor models list --connection laptop
-harbor models use local-qwen --connection laptop
 harbor
 ```
 
 Our Qwen host is `strawberry-laptop-linux` (100.124.226.26); its SSH policy
 currently permits only `strawberry` (100.89.111.39), as `rokdbest`. Another PC
 needs its own authorized Tailscale SSH access before this works. The app never
-changes network ACLs or exposes Ollama publicly. The old Local AI web app and
-its access key are separate: Harbor uses SSH to reach Ollama, not that web API.
+changes network ACLs or exposes Ollama publicly. Harbor reaches the model directly over SSH. It does not use the separate chat
+website or require an Ollama cloud account. See the reusable
+[Tailscale connection recipe](docs/TAILSCALE.md) for setup, diagnostics, and
+what Harbor remembers. Run `harbor connections setup` for terminal prompts;
+use `--replace` to explicitly replace an existing named profile.
 
 ```bash
 harbor connections add studio --kind responses --url https://models.example.com/v1 --key-env MODEL_API_KEY --models my-model

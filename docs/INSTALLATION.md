@@ -142,28 +142,26 @@ use its Linux Tailscale connection. If it is a different device, authenticated
 Tailscale administration must grant that specific Linux device access first;
 do not broaden the source to all tailnet members or allow root.
 
-On the PC, confirm Tailscale connectivity and make the first SSH connection:
+On the PC, use Harbor’s guided Tailscale setup (Harbor 0.2.1+):
 
 ```bash
-ssh rokdbest@100.124.226.26 true
-```
-
-Verify the host identity before accepting its key. Harbor uses strict host-key
-checking and BatchMode, so the normal Linux SSH login must work without a
-password/browser prompt first. For regular OpenSSH servers use an approved SSH
-key; for our Tailscale SSH server the dedicated accept rule authorizes the device.
-Harbor respects Linux SSH config for identities, ProxyCommand, and custom ports.
-Then configure and verify the remote model connection:
-
-```bash
-harbor connections add laptop --kind ssh --ssh rokdbest@100.124.226.26
+harbor connections devices
+harbor connections setup laptop --host strawberry-laptop-linux --user rokdbest --model local-qwen
 harbor connections test laptop
 harbor models list --connection laptop
-harbor models use local-qwen --connection laptop
 harbor
 ```
 
-In an already-open workspace, **C** adds/lists connections, then **M** selects
+If `laptop` is already saved, add `--replace` to authorize changing that profile.
+Without flags, `harbor connections setup` prompts for the required values.
+The Tailscale connector verifies SSH host keys using the coordination server,
+resolves devices from the authenticated tailnet, and handles userspace routing.
+It requires no manual host-key acceptance, SSH alias or fixed local tunnel port.
+The regular `--kind ssh` connector retains its normal OpenSSH behavior for
+existing connections and non-Tailscale SSH servers.
+See [TAILSCALE.md](TAILSCALE.md) for the reusable setup/diagnostic recipe.
+
+In an already-open workspace, **C → s Setup Tailscale** adds a verified connection, then **M** selects
 `laptop · local-qwen`. You can select a model while a terminal is open; the
 saved choice takes effect on its next reopen without interrupting work. Saved
 history remains. CLI `models use` sets the base/default data scope
@@ -221,7 +219,7 @@ instances in the machine's base data directory; no credentials are synced.
 ## Package and Windows shortcut maintenance
 
 The wheel must include the `harbor` package's `workspace.py`, `connections.py`,
-`bridge.py`, `transport.py`, `__init__.py`, and all three mode policies. Both
+`bridge.py`, `transport.py`, `tailscale_support.py`, `__init__.py`, and all three mode policies. Both
 `harbor` and the old `codex-workspace` command must work outside the checkout.
 The source archive also includes docs, scripts, tests and project skills.
 
