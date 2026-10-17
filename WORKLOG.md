@@ -607,3 +607,56 @@ All eight focused recovery/launcher tests passed. Updated usage documentation;
 Harbor's default model and existing conversations remain unchanged. No Windows
 files, model downloads, credentials, tailnet permissions, or runtime package
 versions changed. GitHub fetch succeeded after daemon restoration.
+
+## 2026-10-18 — Ollama sessions omit cloud-only web search (Harbor 0.2.2)
+
+User reported repeated Browsing the web followed by `ollama cloud is disabled:
+web search is unavailable`, including after a greeting. Confirmed laptop Ollama
+loads local-qwen (Qwen3 8.2B Q4_K_M) locally, listens on 127.0.0.1:11434, and has
+OLLAMA_NO_CLOUD=1. Its model system prompt does not contain deployment facts;
+the model's earlier Alibaba-cloud self-description is not trustworthy runtime
+evidence. Both machines left native web_search unset, and Harbor supplied no
+Ollama-specific search override. OpenAI's official configuration reference
+documents `web_search="disabled"` as removing the built-in tool:
+https://learn.chatgpt.com/docs/config-file/config-reference
+
+Implemented a per-conversation override for built-in Ollama and verified
+Ollama-backed named connections (direct Ollama, SSH, Tailscale). Runtime
+preparation records the connection backend in memory only. Both native launch
+arguments and thread/start or thread/resume config omit the cloud-search tool.
+OpenAI/default and generic Responses providers retain their search settings,
+even for a model named Qwen. Existing config, instructions, approvals, sandbox,
+session models and history are preserved. No cloud enablement, global config
+edit, hosting identity injection, or silent provider fallback occurs. Bumped
+the app to 0.2.2 and documented close/reopen recovery for already-running Qwen
+terminals; no live terminal was restarted.
+
+Validation and deployment:
+
+- **97 tests passed** in 33.298 seconds, including real isolated native terminal
+  lifecycle checks. New tests cover start/resume and native launch configuration,
+  all four connection kinds, unchanged hosted-provider search, approval/config
+  preservation, and non-persistence of transient backend metadata.
+- A native Codex client against a local SSE fixture captures actual outgoing
+  Responses requests. Ollama-backed requests omit built-in web search despite
+  an explicit live-search baseline; generic Responses requests retain it. The
+  fixture returns a synthetic greeting without contacting a model/cloud.
+- Real inference through the installed native CLI, not just a direct endpoint
+  call, completed a greeting and saved-thread resume with the hosting question
+  on **both** PC → laptop (managed Tailscale tunnel) and laptop → local Ollama.
+  Both produced nonempty replies and completed turns without built-in search
+  or the cloud-disabled stream error. These checks used disposable CODEX_HOME,
+  temporary working folders, synthetic onboarding credentials, and read-only
+  sandboxing. No real conversations/credentials were used as test fixtures.
+  Native TUI inference was not separately repeated; automated TUI lifecycle
+  tests and native wire/CLI behavior were exercised.
+- Built wheel and source archive with existing Linux Python/setuptools tooling;
+  verified all runtime modules/policies and the new regression test are included.
+  Installed 0.2.2 in the PC's existing pipx environment and the laptop's existing
+  harbor-app venv without restarting conversations/services. The laptop venv
+  has no pip; installation used its existing system/user pip with --python
+  targeting that venv. Its non-login SSH PATH required the existing Linux
+  Node v24.16.0 directory for native-client tests; no toolchain was installed.
+- Syntax and whitespace checks passed. Applied behavioral and development-aware
+  review perspectives in this implementation-aware session; no independent
+  agent/blind-review claim. No Windows files or tailnet policy changed.

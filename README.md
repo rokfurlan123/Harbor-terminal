@@ -152,6 +152,15 @@ approval interface and history. Local model response quality and tool support
 depend on the installed model and Ollama version. Integration checks verify
 selection and native startup without submitting model prompts.
 
+Harbor 0.2.2 disables the built-in cloud web-search tool for Ollama-backed
+conversations, including local, SSH, and Tailscale connections. This prevents
+`ollama cloud is disabled: web search is unavailable` from disconnecting local
+chat. OpenAI and generic Responses providers keep their existing search settings;
+Harbor does not enable Ollama cloud access. Close and reopen an affected Qwen
+terminal to apply the fix while retaining its history. Existing terminals are
+never restarted automatically. Model claims about their hosting are not runtime
+evidence; check the selected connection and server instead.
+
 ## Model connections and remote Qwen
 
 Press **C** in the sidebar or choose **Connections / manage models** in the

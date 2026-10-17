@@ -185,6 +185,16 @@ should list the laptop's models. Stop this diagnostic SSH process afterward;
 Harbor manages its own loopback-only tunnels per operation/conversation.
 The laptop must remain awake with WSL and Ollama running.
 
+If Qwen repeatedly displays **Browsing the web**, then disconnects with
+`ollama cloud is disabled: web search is unavailable`, update Harbor to 0.2.2+
+on both computers and close/reopen the affected conversation terminal. Its
+history remains saved. Harbor now removes that cloud-only tool for verified
+Ollama-backed sessions rather than enabling cloud features or disabling search
+globally. Existing running terminals retain their loaded configuration until
+reopened. A model saying it is hosted in Alibaba's cloud is not deployment
+telemetry; the selected endpoint and loaded Ollama model determine inference
+location. This fix does not make model self-descriptions reliable.
+
 The source PC also needs its Linux Tailscale daemon running. For a non-systemd
 WSL installation where a manually started daemon disappears, see the
 [detached startup recovery](TAILSCALE.md#non-systemd-ubuntuwsl-daemon-disappears-after-closing-a-terminal).

@@ -7,6 +7,32 @@ import workspace as app
 
 
 class ModelTests(unittest.TestCase):
+    def test_search_disabled_only_for_verified_ollama_backends(self):
+        for model in ({'provider': 'ollama', 'model': 'qwen3:8b'},
+                      {'provider': 'harbor_laptop', 'model': 'local-qwen', 'backend': 'ollama'}):
+            with self.subTest(model=model):
+                args = app.model_launch_args(model)
+                self.assertIn('web_search="disabled"', args)
+                for method in ('thread/start', 'thread/resume'):
+                    original = {'web_search': 'live', 'unrelated': {'keep': True}}
+                    request = {'method': method, 'params': {'config': original,
+                               'approvalPolicy': 'on-request', 'sandbox': 'workspace-write'}}
+                    params = app.mode_transform('auto', 'Preserve this', model)(request)['params']
+                    self.assertEqual(params['config']['web_search'], 'disabled')
+                    self.assertEqual(params['config']['unrelated'], {'keep': True})
+                    self.assertEqual(original['web_search'], 'live')
+                    self.assertEqual(params['approvalPolicy'], 'on-request')
+                    self.assertEqual(params['sandbox'], 'workspace-write')
+                self.assertIsNone(app.mode_transform('auto', model=model)({'method': 'turn/start'}))
+        for model in (None, {}, {'provider': 'openai', 'model': 'gpt-test'},
+                      {'provider': 'harbor_api', 'model': 'qwen3:8b', 'backend': 'responses'}):
+            with self.subTest(model=model):
+                self.assertNotIn('web_search', ' '.join(app.model_launch_args(model)))
+                for method in ('thread/start', 'thread/resume'):
+                    request = {'method': method, 'params': {'config': {'web_search': 'live'}}}
+                    params = app.mode_transform('auto', model=model)(request)['params']
+                    self.assertEqual(params['config']['web_search'], 'live')
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

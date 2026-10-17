@@ -236,6 +236,11 @@ def project_for(thread):
     return None if mode == "conversation" or (cwd == str(Path.home()) and mode == "auto") else cwd
 
 
+def uses_ollama(model):
+    """Use verified connection metadata, not a model name or URL guess."""
+    return bool(model and (model.get("provider") == "ollama" or model.get("backend") == "ollama"))
+
+
 def mode_transform(mode, baseline="", model=None):
     if mode not in MODES:
         raise ValueError("Unknown workspace mode")
@@ -252,9 +257,14 @@ def mode_transform(mode, baseline="", model=None):
         if model:
             params["model"] = model["model"]
             params["modelProvider"] = model["provider"]
+            overrides = dict(params.get("config") or {})
             if model.get("provider_config"):
-                overrides = dict(params.get("config") or {})
                 overrides["model_providers." + model["provider"]] = model["provider_config"]
+            if uses_ollama(model):
+                # Ollama's built-in search needs its cloud service. Never enable
+                # cloud access just to make an otherwise local conversation work.
+                overrides["web_search"] = "disabled"
+            if overrides:
                 params["config"] = overrides
         return request
     return transform
@@ -265,6 +275,8 @@ def model_launch_args(model):
     if not model:
         return []
     args = ['-m', model['model'], '-c', 'model_provider=' + json.dumps(model['provider'])]
+    if uses_ollama(model):
+        args += ['-c', 'web_search="disabled"']
     if model.get('provider_config'):
         # Provider options are flat strings/bools. JSON strings are valid TOML
         # basic strings; never include credential values or permission settings.
@@ -1386,7 +1398,8 @@ def run_conversation(tid, cwd):
     with connections.connect(profile) as endpoint:
         # Fail early and keep this tunnel alive until this exact native terminal exits.
         canonical = endpoint.resolve_model(model["model"])
-        prepared = dict(model, model=canonical, provider="harbor_" + profile["id"], provider_config=endpoint.provider())
+        prepared = dict(model, model=canonical, provider="harbor_" + profile["id"], provider_config=endpoint.provider(),
+                        backend="responses" if profile["kind"] == "responses" else "ollama")
         return _run_conversation(tid, cwd, prepared)
 
 

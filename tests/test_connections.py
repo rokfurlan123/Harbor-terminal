@@ -113,9 +113,11 @@ class ConnectionTests(unittest.TestCase):
             result = app.mode_transform('auto', 'Keep instructions', seen[0])(request)['params']
             self.assertEqual(result['config']['model_providers.harbor_laptop']['base_url'], self.url+'/v1')
             self.assertTrue(result['config']['existing'])
+            self.assertEqual(result['config']['web_search'], 'disabled')
             self.assertEqual(result['approvalPolicy'],'on-request')
             self.assertEqual(result['sandbox'],'workspace-write')
         self.assertNotIn('provider_config', app.session_model('draft-test'))
+        self.assertNotIn('backend', app.session_model('draft-test'))
         self.store.change('laptop')
         with self.assertRaisesRegex(RuntimeError, 'Connection not found'):
             app.run_conversation('draft-test', str(self.root))
@@ -135,6 +137,28 @@ class ConnectionTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             app.model_cli(['models','default'])
         self.assertEqual(app.preferences()['new_session_model'], {})
+
+    def test_prepared_backend_search_policy_for_every_connection_kind(self):
+        for kind in ('ollama', 'ssh', 'tailscale', 'responses'):
+            with self.subTest(kind=kind):
+                profile = {'id': 'laptop', 'kind': kind}
+                profile.update({'ssh': 'tester@studio'} if kind in ('ssh', 'tailscale') else {'url': self.url})
+                self.store.change('laptop', profile)
+                app.set_session_model('search-fixture', {'provider': 'harbor_laptop', 'connection': 'laptop', 'model': 'qwen-test'})
+                endpoint = Mock()
+                endpoint.resolve_model.return_value = 'qwen-test'
+                endpoint.provider.return_value = {'name': 'fixture', 'wire_api': 'responses', 'base_url': self.url + '/v1'}
+                with patch.object(app.connections, 'connect') as connect, patch.object(app, '_run_conversation') as run:
+                    connect.return_value.__enter__.return_value = endpoint
+                    app.run_conversation('search-fixture', str(self.root))
+                    prepared = run.call_args.args[2]
+                expected = 'responses' if kind == 'responses' else 'ollama'
+                self.assertEqual(prepared['backend'], expected)
+                self.assertEqual(app.uses_ollama(prepared), kind != 'responses')
+                for method in ('thread/start', 'thread/resume'):
+                    request = {'method': method, 'params': {'config': {'web_search': 'live'}}}
+                    params = app.mode_transform('auto', model=prepared)(request)['params']
+                    self.assertEqual(params['config']['web_search'], 'live' if kind == 'responses' else 'disabled')
 
     def test_tunnel_command_and_failure_cleanup(self):
         profile = connections.validate({'id':'remote','kind':'ssh','ssh':'user@100.89.111.39'})
@@ -196,7 +220,7 @@ class ConnectionTests(unittest.TestCase):
         rpc = app.Rpc(standalone=True)
         try:
             with connections.connect(connections.validate(self.profile)) as endpoint:
-                model = {'model':'qwen-test','provider':'harbor_laptop','provider_config':endpoint.provider()}
+                model = {'model':'qwen-test','provider':'harbor_laptop','provider_config':endpoint.provider(), 'backend': 'ollama'}
                 transform = app.mode_transform('conversation', 'Existing instructions', model)
                 params = transform({'method':'thread/start','params':{'cwd':str(self.root),'approvalPolicy':'on-request'}})['params']
                 result = rpc.call('thread/start', params)
