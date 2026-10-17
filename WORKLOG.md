@@ -382,3 +382,18 @@ Fresh Harbor launches use the installed update. Existing windows/conversations
 were not restarted or killed; no reboot or shell restart is required just to run
 the already-available harbor command. No runtime code changed in this step;
 focused shortcut/SSH/connection checks supplement the preceding 64 passing tests.
+
+## 2026-10-17 — Save update conversation under Harbor
+
+At the user's request, assigned conversation 01a148e5-123a-7c52-b07b-0ac0a3b8aaed
+to the Harbor project (/home/rokdbest/codex-workspace) using Harbor's own metadata
+helpers. Verified the assignment in both the current instance and base workspace
+scope; ensured the project display name is Harbor. No new or duplicate session,
+native history edits, execution-directory changes, or running-process restarts.
+
+Conversation summary: migrated Codex Workspace to Harbor 0.2.0, verified all 64
+regression tests and installed sidebar startup, updated both desktop shortcuts
+with backup, and configured/tested authenticated laptop model discovery. Fresh
+Harbor windows use the update without a Windows reboot. Laptop Qwen inference
+remains untested; the default model was deliberately preserved. Detailed evidence
+and setup decisions are recorded in the preceding entries.
