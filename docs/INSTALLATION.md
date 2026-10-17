@@ -161,8 +161,9 @@ harbor
 ```
 
 In an already-open workspace, **C** adds/lists connections, then **M** selects
-`laptop · local-qwen`. Close an existing conversation terminal before changing its
-model; saved history remains. CLI `models use` sets the base/default data scope
+`laptop · local-qwen`. You can select a model while a terminal is open; the
+saved choice takes effect on its next reopen without interrupting work. Saved
+history remains. CLI `models use` sets the base/default data scope
 unless launched with that instance's DATA environment. The UI picker targets the
 current instance directly.
 

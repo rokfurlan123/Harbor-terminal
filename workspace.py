@@ -876,14 +876,14 @@ class Sidebar:
         if model is None:
             return
         if selected:
-            if any(p["thread"] == selected["id"] and p["dead"] != "1" for p in self.workspace.panes()):
-                self.message = "Close terminal before changing model"
-                return
             set_session_model(selected["id"], model or {"default": True})
             selected["workspaceModel"] = model
         else:
             save_preferences(new_session_model=model)
-        self.message = ("Session model: " if selected else "New sessions: ") + model_label(model)
+        running = selected and any(p["thread"] == selected["id"] and p["dead"] != "1"
+                                   for p in self.workspace.panes())
+        self.message = ("Saved for next reopen: " if running else
+                        "Session model: " if selected else "New sessions: ") + model_label(model)
 
     def context_menu(self):
         entries = [("Open conversation", "\n"), ("New conversation", "n"),
@@ -1008,6 +1008,8 @@ class Sidebar:
             if pane and pane["dead"] != "1" and not pane.get("mode"):
                 mode = "Reopen: " + mode
             label = model_label(thread["workspaceModel"]) if thread.get("workspaceModel") else ""
+            if label and pane and pane["dead"] != "1":
+                label = "Next open: " + label
             self.put(y + 1, indent + f"{mode} · {status}" + (" · " + label if label else ""), curses.A_DIM)
         if self.query and not self.filtered() and not any(row.get("cwd") for row in items):
             self.put(4, "No matching conversations", curses.A_DIM)
@@ -1079,9 +1081,6 @@ class Sidebar:
             self.manage_connections()
         elif key in ("M", "model:default"):
             target = selected if key == "M" else None
-            if target and any(p["thread"] == target["id"] and p["dead"] != "1" for p in self.workspace.panes()):
-                self.message = "Close terminal before changing model"
-                return
             self.submit(lambda: available_models(self.connection()),
                         lambda catalog: self.apply_model_choice(target, catalog), "Loading models…")
         elif key == "+":

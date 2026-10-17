@@ -84,7 +84,7 @@ New instance settings live under `<data-directory>/instances/<name>/`. Each star
 | n | New conversation under the selected category/project; choose mode and, when relevant, project folder |
 | + / Click [+] beside a project | Start a session directly in that project, without setup prompts |
 | C | Manage model connections; list, load, unload, or download Ollama models |
-| M | Choose the selected closed session’s model; on a folder, choose the default for new sessions |
+| M | Choose the selected session’s model; on a folder, choose the default for new sessions |
 | m | Change a closed session's mode (also in the right-click menu) |
 | c | Close its terminal after confirmation; retain saved history |
 | e | Rename the saved conversation |
@@ -115,11 +115,13 @@ project, and guided new sessions. Catalog entries do not guarantee account acces
 Ollama must be installed and running for local discovery and execution; models
 are not downloaded automatically.
 
-To change an existing conversation, close its terminal with `c`, select it, press
-`M` (or right-click → Change session model), then reopen it. Its saved history is
-retained. Open terminals are never restarted by the picker. **Codex default**
-restores the configured model/provider on next launch. Explicit model choices
-appear beside the session status; these are launch preferences, not live telemetry
+To change an existing conversation, select it and press `M` (or right-click →
+Change session model), even while its terminal is open. The choice is saved for
+its next launch; the picker never interrupts or restarts running work. Open
+terminals keep their current model until you close and reopen them. The sidebar
+labels their saved choice **Next open**, and the picker confirms **Saved for next
+reopen**. Saved history is retained. **Codex default** restores the configured
+model/provider on next launch. These are launch preferences, not live telemetry
 of changes made through native Codex controls. The right-click menu also lets you
 change the default for new sessions while a conversation is selected.
 

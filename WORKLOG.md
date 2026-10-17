@@ -397,3 +397,20 @@ with backup, and configured/tested authenticated laptop model discovery. Fresh
 Harbor windows use the update without a Windows reboot. Laptop Qwen inference
 remains untested; the default model was deliberately preserved. Detailed evidence
 and setup decisions are recorded in the preceding entries.
+
+## 2026-10-17 — Allow model selection with open terminals
+
+Removed both live-terminal guards from M and its picker callback. Selections and
+Codex-default resets now persist while a conversation remains open, without
+closing/restarting it or claiming the running model changed. Confirmation says
+“Saved for next reopen”; live session preference labels say “Next open”. README
+and installation guidance describe the deferred application explicitly.
+
+Checks: all 64 unittest cases passed with Unix socket access outside the sandbox;
+initial sandbox run could not use sockets. Isolated model-catalog tests from real
+connection profiles after a personal connection exposed the old fixture leak.
+Cancellation, live selection/reset, closed selection, and no terminal close/open
+are covered. git diff --check passed. Reinstalled Harbor 0.2.0 using pipx and
+verified CLI help. Reloaded only this workspace's sidebar; conversation panes
+were not restarted. Live model switching across providers is not implemented;
+choices apply at next launch as before, but no longer require closing first.

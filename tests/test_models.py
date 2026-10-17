@@ -14,6 +14,9 @@ class ModelTests(unittest.TestCase):
         patcher = patch.object(app, 'DATA', Path(temp.name))
         patcher.start()
         self.addCleanup(patcher.stop)
+        store = patch.object(app, 'connection_store')
+        store.start().return_value.all.return_value = []
+        self.addCleanup(store.stop)
         self.rpc = object.__new__(app.Rpc)
         self.rpc.call = Mock(return_value={'data': [], 'nextCursor': None})
         self.model = {'provider': 'ollama', 'model': 'qwen3:8b'}
@@ -72,25 +75,30 @@ class ModelTests(unittest.TestCase):
         side.workspace.panes.return_value = [{'thread': thread['id'], 'dead': '0'}]
         self.assertEqual(create()['id'], thread['id'])
 
-    def test_open_model_change_blocked_and_cancel_keeps_choice(self):
+    def test_open_model_choice_saved_without_interrupting_and_cancel_keeps_choice(self):
         side = self.sidebar()
         thread = self.rpc.create('Test', self.cwd)
         side.items = [thread]
         side.select_thread(thread)
         side.workspace.panes.return_value = [{'thread': thread['id'], 'dead': '0'}]
         side.action('M')
-        side.submit.assert_not_called()
-        self.assertIn('Close terminal', side.message)
-        side.workspace.panes.return_value = []
+        side.submit.assert_called_once()
         side.choose_model = Mock(return_value=None)
         side.apply_model_choice(thread, ([{}, self.model], ''))
         self.assertEqual(app.session_model(thread['id']), {})
         side.choose_model.return_value = self.model
         side.apply_model_choice(thread, ([{}, self.model], ''))
         self.assertEqual(app.session_model(thread['id']), self.model)
+        self.assertIn('Saved for next reopen', side.message)
+        side.workspace.close.assert_not_called()
+        side.workspace.open.assert_not_called()
         side.choose_model.return_value = {}
         side.apply_model_choice(thread, ([{}, self.model], ''))
         self.assertEqual(app.session_model(thread['id']), {'default': True})
+        side.workspace.panes.return_value = []
+        side.choose_model.return_value = self.model
+        side.apply_model_choice(thread, ([{}, self.model], ''))
+        self.assertTrue(side.message.startswith('Session model: '))
 
     def test_catalog_pagination_local_discovery_and_unavailable_service(self):
         self.rpc.call.side_effect = [
