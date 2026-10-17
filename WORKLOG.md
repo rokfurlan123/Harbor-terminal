@@ -328,3 +328,31 @@ All **64** merged tests passed in 12.706 seconds, including the incoming resolve
 tests. Rebuilt and reinstalled the merged Harbor package; the installed-package
 smoke check remains scoped to temporary Codex homes/data/sockets. The repository
 and checkout keep their existing names for update/history compatibility.
+
+## 2026-10-17 — Install Harbor update on this PC
+
+At user request, fetched GitHub and fast-forwarded clean main from 5943e01 to
+6f880f7. Confirmed the application rename to Harbor 0.2.0; the intended private
+repository and existing checkout retain codex-workspace for compatibility.
+Reviewed the migration guide and bundled local Ollama, SSH-forwarded Ollama,
+Responses API connection, and model-management features.
+
+Built harbor-0.2.0-py3-none-any.whl, verified package contents (all five runtime
+modules and three mode policies), and installed it in a disposable Linux venv
+before replacing the old pipx codex-workspace distribution with harbor 0.2.0.
+Both harbor and codex-workspace entry points work outside the checkout; the
+existing ~/bin compatibility link remains valid. Linux Python 3.12.3, tmux 3.4,
+and Codex 0.163.0 were retained; no Windows files or live sessions were changed.
+
+Validation: all 64 regression tests passed in 13.421s with isolated fixtures.
+Installed doctor passed with PATH=/usr/bin:/bin, temporary CODEX_HOME/data/project
+root and a unique tmux socket. Connection CLI and actual HARBOR/Trivia/Projects/
+Misc sidebar startup passed; the disposable tmux server was cleaned up. Local
+model discovery explicitly reported an unreachable Ollama endpoint on this PC;
+no remote connection, model downloads, or inference were configured/tested.
+The initial build dependency fetch was blocked by sandbox DNS and succeeded
+on an approved network retry. Final verification was canceled through the UI,
+then resumed at user request. The first resumed smoke check stopped at unavailable
+local Ollama; rerunning with that optional service reported separately passed the
+sidebar check. No model prompts, credential migration, or internal database edits.
+Windows shortcut rename/update remains unperformed pending explicit permission.
