@@ -356,3 +356,29 @@ then resumed at user request. The first resumed smoke check stopped at unavailab
 local Ollama; rerunning with that optional service reported separately passed the
 sidebar check. No model prompts, credential migration, or internal database edits.
 Windows shortcut rename/update remains unperformed pending explicit permission.
+
+## 2026-10-17 — Complete desktop launch and laptop connection setup
+
+User approved updating Windows shortcuts. Inspected the existing desktop shortcut
+and preserved its Windows Terminal target, maximized window, Ubuntu-24.04 distro,
+explicit Linux PATH, working directory and icon. Created Harbor.lnk and retargeted
+the existing Codex Workspace.lnk to the installed harbor command. Backed up the
+old link as Codex Workspace.lnk.pre-harbor-20261017-101148.bak. Reread both COM
+shortcut objects and verified target and arguments; no Windows toolchain installed.
+
+Confirmed this Linux device is strawberry (100.89.111.39). Initial strict SSH to
+the laptop correctly rejected an unknown host key. Verified the laptop through
+`tailscale ssh`, which authenticates host keys using the coordination server,
+then added only that IP's three authenticated public host keys from Tailscale's
+ssh_known_hosts to the normal Linux known_hosts. Normal BatchMode/strict SSH
+then succeeded. Added Harbor connection `laptop` using authenticated SSH to
+rokdbest@100.124.226.26. Connection test and remote model discovery both passed,
+listing local-qwen:latest and qwen3:8b. No API keys copied, default model changes,
+model downloads, inference prompts, ACL changes, or public listeners. Actual remote
+inference and history reopen remain untested; successful discovery is not an
+inference claim. Connection profiles remain local and excluded from Git.
+
+Fresh Harbor launches use the installed update. Existing windows/conversations
+were not restarted or killed; no reboot or shell restart is required just to run
+the already-available harbor command. No runtime code changed in this step;
+focused shortcut/SSH/connection checks supplement the preceding 64 passing tests.
