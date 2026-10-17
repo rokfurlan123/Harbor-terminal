@@ -189,6 +189,28 @@ The source PC also needs its Linux Tailscale daemon running. For a non-systemd
 WSL installation where a manually started daemon disappears, see the
 [detached startup recovery](TAILSCALE.md#non-systemd-ubuntuwsl-daemon-disappears-after-closing-a-terminal).
 
+### Qwen terminal shortcut on the model host
+
+Harbor's model picker and a shell command named `qwen` are separate. On the
+laptop, which already has `~/.local/bin/ollama` and the installed `local-qwen`
+model, this optional helper supplies local terminal chat:
+
+```bash
+python3 scripts/install_local_qwen.py
+~/.local/bin/qwen 'Say hello /no_think'
+```
+
+With `~/.local/bin` on the Linux PATH, use `qwen` (no message opens interactive
+chat). The helper refuses to overwrite an unrelated command or symlink. Do not
+run it on the source PC: that PC's existing `qwen` launcher intentionally uses
+private SSH to the laptop. It does not install Ollama, download a model, or
+change Harbor preferences. Non-login SSH sessions can have a smaller PATH;
+use `~/.local/bin/qwen` or `~/.local/bin/harbor` explicitly there.
+
+In Harbor itself, use **F5 → laptop · local-qwen:latest** on the PC and
+**F5 → Local · local-qwen:latest** on the laptop. Existing conversation models
+and the default for new conversations remain unchanged until explicitly selected.
+
 ## Other endpoints and model management
 
 ```bash

@@ -42,6 +42,10 @@ and local preferences are not bundled or synced by installing the app.
 
 To upgrade from Codex Workspace, follow [the Harbor migration guide](docs/INSTALLATION.md#upgrade-codex-workspace-to-harbor). It preserves conversations and preferences; the old command remains an alias.
 
+For Qwen on both computers, see [PC-to-laptop model access](docs/INSTALLATION.md#connect-the-pc-to-qwen-on-the-laptop)
+and the optional [model-host terminal shortcut](docs/INSTALLATION.md#qwen-terminal-shortcut-on-the-model-host).
+Terminal shortcuts do not change Harbor's selected model.
+
 To build a distributable wheel and source archive:
 
 ```bash

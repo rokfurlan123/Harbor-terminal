@@ -583,3 +583,27 @@ checked. Real privileged installation, durable source-side inference, and
 laptop-local Harbor inference remain pending user execution of the helper.
 No independent reviewer or blind-testing claim. Future-boot behavior remains
 unverified until a user-initiated WSL restart; no restart was performed here.
+
+### Recovery applied and both endpoints verified
+
+The user executed the privileged helper successfully; it reported backup
+`/etc/wsl.conf.pre-harbor-1792276963693863918` and Tailscale Running. Read-back
+verified the detached starter and Linux boot hook, with the root daemon still
+running through subsequent separate SSH operations. Source-PC Harbor connection
+test/model listing passed. Actual Responses requests through each machine's
+installed Harbor connection implementation returned `HARBOR_PC_OK` from PC →
+laptop via a managed Tailscale tunnel, and `HARBOR_LAPTOP_OK` from laptop →
+its local Ollama. These are real inference checks, not just SSH/model listings;
+no live conversation was used. Native TUI create/reopen was not repeated in
+this recovery task. Future-boot behavior still awaits an eventual user restart.
+
+Added the optional `scripts/install_local_qwen.py` helper and installed its
+local-only launcher on the laptop after confirming the command was absent.
+The source PC's existing SSH launcher was preserved. Actual terminal commands
+returned `QWEN_LAPTOP_OK` on the laptop and `QWEN_PC_OK` on the PC. Two focused
+launcher tests cover interactive/no-prompt invocation, literal/space-containing
+prompts, idempotence, missing Ollama, and refusing existing commands/symlinks.
+All eight focused recovery/launcher tests passed. Updated usage documentation;
+Harbor's default model and existing conversations remain unchanged. No Windows
+files, model downloads, credentials, tailnet permissions, or runtime package
+versions changed. GitHub fetch succeeded after daemon restoration.
