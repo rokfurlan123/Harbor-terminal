@@ -467,3 +467,19 @@ and WSL launch command. Original settings.json was backed up alongside it with
 suffix .pre-harbor-name-20261017-112431.bak, and the modified profile was read back.
 No Windows toolchains were installed or run; the Windows GUI itself was not
 visually tested.
+
+## 2026-10-17 — Verified laptop Qwen selection in current Harbor
+
+User requested selectable laptop Qwen and communication from Harbor. Existing
+installed code matches the checkout and already supplies this behavior; no code
+or preference changes were necessary. The shared `laptop` SSH connection targets
+strawberry-laptop-linux (100.124.226.26). Installed Harbor connection test and
+model listing succeeded. The actual picker catalog function returned
+`laptop · local-qwen:latest` and `laptop · qwen3:8b` in the current instance.
+A short Responses request through Harbor's connection implementation completed
+with visible reply `hello from Qwen` using local-qwen:latest and /no_think.
+The initial 80-token request exhausted its visible-output budget with empty text;
+the successful check used 256 tokens. This verifies endpoint communication, not
+a full native TUI conversation/reopen test. No live conversations were modified
+or restarted. F5/top-bar Model lets the user select a model in a separate child;
+no global default was changed by this verification.
