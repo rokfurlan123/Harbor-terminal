@@ -508,6 +508,7 @@ class Workspace:
 
     def focus(self):
         tmux("select-pane", "-t", self.main()["pane"])
+        refresh_toolbar()
 
     def open(self, thread):
         tid = thread["id"]
@@ -522,6 +523,9 @@ class Workspace:
                         "-n", "conversation", "-c", cwd, command("run", tid, cwd))
             tmux("set-option", "-p", "-t", pane, "@workspace_thread", tid)
             found = next(p for p in self.panes() if p["pane"] == pane)
+        if not tmux("show-options", "-pqv", "-t", found["pane"], "@harbor_launch_model") or found["dead"] == "1":
+            tmux("set-option", "-p", "-t", found["pane"], "@harbor_launch_model",
+                 json.dumps(session_model(tid)))
         main = self.main()
         if main["pane"] != found["pane"]:
             tmux("swap-pane", "-d", "-s", found["pane"], "-t", main["pane"])
@@ -537,6 +541,7 @@ class Workspace:
             tmux("swap-pane", "-d", "-s", home["pane"], "-t", found["pane"])
             found = next(p for p in self.panes() if p["thread"] == tid)
         tmux("kill-pane", "-t", found["pane"])
+        refresh_toolbar()
 
 
 def clean(text):
@@ -569,6 +574,85 @@ def copy_text(value):
 
 def configure_mouse():
     tmux("bind-key", "-n", "MouseDown3Pane", "select-pane -t = ; send-keys -M")
+
+
+def configure_toolbar():
+    """Harbor-owned chrome above (not inside) the native conversation child."""
+    tmux("set-option", "-t", SESSION, "status", "on")
+    tmux("set-option", "-t", SESSION, "status-position", "top")
+    tmux("set-option", "-t", SESSION, "status-style", "bg=colour235,fg=white")
+    # Explicit ranges survive styling and exclude the hidden child-window list.
+    tmux("set-option", "-t", SESSION, "status-format[0]",
+         "#[align=left,bold] HARBOR #[nobold] | #[reverse,range=left] Model: #{@harbor_model} v "
+         "#[noreverse,norange,align=right] F5 Model | F6 Sessions ")
+    popup = ("display-popup", "-E", "-t", SESSION + ":", "-x", "C", "-y", "C",
+             "-w", "80%", "-h", "80%", "-T",
+             "Harbor — choose model (opens a child session)", command("model-picker"))
+    tmux("bind-key", "-n", "F5", *popup)
+    # Open on release so the opening click cannot dismiss the popup outside it.
+    tmux("bind-key", "-n", "MouseUp1StatusLeft", *popup)
+    # Custom status formats can report styled text as StatusDefault in tmux.
+    tmux("bind-key", "-n", "MouseUp1StatusDefault", *popup)
+    refresh_toolbar()
+
+
+def active_child_model(workspace):
+    pane = workspace.main()
+    raw = tmux("show-options", "-pqv", "-t", pane["pane"], "@harbor_launch_model")
+    return json.loads(raw) if raw else session_model(pane["thread"])
+
+
+def refresh_toolbar():
+    workspace = Workspace()
+    model = active_child_model(workspace)
+    # Model names are data, never tmux format expressions or style directives.
+    label = clean(model_label(model)).replace("#", "##")
+    tmux("set-option", "-t", SESSION, "@harbor_model", label)
+
+
+def open_model_child(workspace, rpc, model):
+    """Choose a model without replacing or sending keystrokes into a live child."""
+    main = workspace.main()
+    panes = workspace.panes()
+    live_ids = {p["thread"] for p in panes if p["dead"] != "1"}
+    current = next((t for t in rpc.threads(live_ids=live_ids)
+                    if t["id"] == main["thread"]), None)
+    save_preferences(new_session_model=model)
+    if current and main["dead"] != "1":
+        running_model = active_child_model(workspace)
+        if running_model == model or (running_model == {"default": True} and not model):
+            workspace.focus()
+            return current
+    cwd = current.get("cwd") if current else str(Path.home())
+    mode = current.get("workspaceMode", "auto") if current else "auto"
+    topic = topic_for(current) if current else None
+    child = rpc.create_or_reuse("New session", cwd, mode, live_ids, topic=topic)
+    workspace.open(child)
+    return child
+
+
+def model_picker(screen):
+    curses.curs_set(0)
+    curses.use_default_colors()
+    curses.mousemask(curses.ALL_MOUSE_EVENTS)
+    side = Sidebar(screen)
+    try:
+        side.put(0, "Loading models…", curses.A_BOLD)
+        screen.refresh()
+        rpc = side.connection()
+        model = side.choose_model(active_child_model(side.workspace), available_models(rpc))
+        if model is not None:
+            open_model_child(side.workspace, rpc, model)
+    except (RuntimeError, OSError, ValueError, curses.error) as exc:
+        screen.erase()
+        side.put(0, "Could not open model: " + str(exc))
+        side.put(2, "Press any key to close")
+        screen.refresh()
+        screen.get_wch()
+    finally:
+        side.pool.shutdown(wait=True)
+        if side.rpc:
+            side.rpc.close()
 
 
 def configure_keys(sidebar):
@@ -1256,7 +1340,8 @@ def welcome():
     print("  Click Start blank session, or press F6 then b, to start immediately.")
     print("  Press n to create a session: Auto, Conversation, or Project work.")
     print("  Press m or right-click to change a closed session's mode.\n")
-    print("  Press M to choose a model; C to manage local or remote connections.\n")
+    print("  Click Model in Harbor's top bar or press F5 to open a model child.")
+    print("  Sidebar M saves a session's next-launch model; C manages connections.\n")
     print("  F2  View warnings in the focused Codex conversation")
     print("  F6  Focus session sidebar")
     print("  F3  Focus conversation")
@@ -1305,6 +1390,8 @@ def _run_conversation(tid, cwd, prepared_model=None):
     transform = mode_transform(mode, baseline, model)
     if os.environ.get("TMUX_PANE"):
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_mode", mode)
+        tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@harbor_launch_model",
+             json.dumps(session_model(tid)))
 
     if __package__:
         from .bridge import bridge
@@ -1466,6 +1553,7 @@ def start(detached=False):
     configure_mouse()
     sidebar = next(p["pane"] for p in Workspace().panes() if p["thread"] == "sidebar")
     configure_keys(sidebar)
+    configure_toolbar()
     tmux("set-hook", "-t", SESSION, "client-resized",
          f"resize-pane -t {sidebar} -x 33%")
     tmux("resize-pane", "-t", sidebar, "-x", "33%")
@@ -1536,7 +1624,7 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] in ("connections", "models"):
         return model_cli(sys.argv[1:])
     parser = argparse.ArgumentParser(prog="harbor", description=__doc__)
-    parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "doctor"], default="start")
+    parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "model-picker", "doctor"], default="start")
     parser.add_argument("arguments", nargs="*")
     parser.add_argument("--detached", action="store_true", help="Start in the background without attaching")
     parser.add_argument("--instance", help="Open or reconnect to a named workspace (legacy reconnects to the original)")
@@ -1546,6 +1634,8 @@ def main():
         start(args.detached)
     elif args.mode == "sidebar":
         curses.wrapper(lambda screen: Sidebar(screen).loop())
+    elif args.mode == "model-picker":
+        curses.wrapper(model_picker)
     elif args.mode == "welcome":
         welcome()
     elif args.mode == "focus":

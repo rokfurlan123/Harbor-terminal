@@ -113,7 +113,10 @@ harbor
 
 The right sidebar should say **HARBOR**, with Trivia, Projects, and Misc. Plain
 `codex` opens native Codex without the sidebar. Use a terminal at least 100 columns
-wide, F6 to focus the sidebar, **C** for connections/model management, and **M**
+wide. The Harbor-owned top bar stays above the native child terminal: click
+**Model** or press **F5** from either pane to open a model child while preserving
+existing conversations. Use F6 to focus the sidebar, **C** for connections/model
+management, and **M**
 for model selection. The picker identifies remote models by connection ID.
 The Qwen topic under Misc is organizational; selecting that topic alone does
 not change the inference model.

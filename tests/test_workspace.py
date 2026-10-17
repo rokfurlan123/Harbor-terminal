@@ -18,6 +18,7 @@ class TitleTests(unittest.TestCase):
                 patch.object(app, 'initialize_projects'), \
                 patch.object(app, 'configure_mouse'), \
                 patch.object(app, 'configure_keys'), \
+                patch.object(app, 'configure_toolbar'), \
                 patch.object(app.shutil, 'which', return_value='/usr/bin/tool'), \
                 patch.object(app, 'Workspace') as workspace:
             workspace.return_value.panes.return_value = [{'thread': 'sidebar', 'pane': '%2'}]

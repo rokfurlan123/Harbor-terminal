@@ -425,3 +425,45 @@ and no Windows files changed. Terminal rendering remains client-dependent.
 README updated. Added a reattach regression check including no pane restart.
 All 65 tests passed outside the socket-restricted sandbox; git diff --check passed.
 Reinstalled the Linux pipx package for future launches.
+
+## 2026-10-17 — Harbor-owned top model tab and native child terminals
+
+Implemented the requested terminal shell layout: a persistent Harbor top bar
+above the unmodified native Codex child, retaining the right session tree.
+Click Model (mouse release) or press global F5 from either pane to open a separate
+Harbor model-picker popup. It does not depend on sidebar selection/focus or the
+sidebar's outstanding catalog refresh, unlike sidebar M. Explicit status formatting
+hides tmux's internal parked/service window list; styled status text also has a
+StatusDefault click fallback.
+
+Choosing another model saves the new-session default and opens/reuses an unused
+child in the visible session's folder, mode and topic. Choosing the currently
+running launch model keeps that child (including explicit Codex-default settings).
+Other children, messages, native approvals and in-flight work remain untouched.
+No history is silently moved between model sessions. Pane launch metadata keeps
+the header independent of pending next-launch preferences; opening, focusing and
+closing children update the label. Native /model changes are not live telemetry.
+Discovery/launch errors are shown in the popup; Escape cancels. Startup and
+reattach configure the bar automatically. Updated README and installation guide.
+
+Verification: all 74 unittest cases passed with local Unix socket access outside
+the sandbox, including an attached 140x40 PTY exercising actual F5, a real SGR
+press/release on the top bar, Escape, and unchanged pane PIDs. Added regression
+checks for same-model/default reuse, other-model child launch without closing the
+old child, home context, cancellation, preference/launch distinction, and safe
+model-label formatting. Existing launch test now waits for its catalog and draws
+between navigation keys rather than sending Enter during a background refresh.
+The attached test also waits for popup dismissal: raw Escape includes terminal
+and curses delays, so a fixed one-second sleep had sent the next click into the
+old popup. git diff --check passed. This was development-aware review and direct
+behavioral testing by the implementing agent, not independent/blind review.
+No model inference prompts were sent, and provider response quality is untested.
+
+Reinstalled Harbor 0.2.0 with Linux pipx. Applied toolbar settings to this live
+instance and reloaded only its sidebar; read-back comparisons confirmed all
+conversation and service PIDs unchanged. The approved Windows Terminal profile
+rename was also completed: its name and tabTitle are Harbor, with identical GUID
+and WSL launch command. Original settings.json was backed up alongside it with
+suffix .pre-harbor-name-20261017-112431.bak, and the modified profile was read back.
+No Windows toolchains were installed or run; the Windows GUI itself was not
+visually tested.

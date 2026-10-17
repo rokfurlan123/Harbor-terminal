@@ -41,7 +41,19 @@ class LaunchTests(unittest.TestCase):
                     capture = app.tmux('capture-pane','-p','-t',side['pane'])
                     self.assertIn('HARBOR',capture)
                     # Expand the project branch, then select its session.
-                    app.tmux('send-keys', '-t', side['pane'], 'Down', 'Down', 'Enter', 'Down')
+                    # Wait for the catalog before navigating; actions during a
+                    # background refresh are intentionally ignored. The outer
+                    # toolbar also resizes the child once during startup.
+                    deadline = time.monotonic() + 10
+                    while True:
+                        capture = app.tmux('capture-pane', '-p', '-t', side['pane'])
+                        if '1 saved conversations' in capture:
+                            break
+                        self.assertLess(time.monotonic(), deadline, capture)
+                        time.sleep(.05)
+                    for key in ('Down', 'Down', 'Enter', 'Down'):
+                        app.tmux('send-keys', '-t', side['pane'], key)
+                        time.sleep(.15)
                     deadline = time.monotonic() + 5
                     while True:
                         capture = app.tmux('capture-pane', '-p', '-t', side['pane'])

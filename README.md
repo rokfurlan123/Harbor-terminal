@@ -84,6 +84,7 @@ New instance settings live under `<data-directory>/instances/<name>/`. Each star
 | n | New conversation under the selected category/project; choose mode and, when relevant, project folder |
 | + / Click [+] beside a project | Start a session directly in that project, without setup prompts |
 | C | Manage model connections; list, load, unload, or download Ollama models |
+| F5 | Open the top-bar model picker from any pane |
 | M | Choose the selected session’s model; on a folder, choose the default for new sessions |
 | m | Change a closed session's mode (also in the right-click menu) |
 | c | Close its terminal after confirmation; retain saved history |
@@ -98,6 +99,23 @@ New instance settings live under `<data-directory>/instances/<name>/`. Each star
 In text prompts, Ctrl-U clears the field and Escape cancels. Codex's own shortcuts and approval interface remain available in the conversation pane. For terminal copy/paste, Shift bypasses tmux mouse handling in many terminals.
 
 The right-click menu includes every footer action and copies the selected session's reference (name, ID, project), ID alone, project path, or a shell-quoted Linux resume command. Drafts need saved history before a resume command is available. Copy uses tmux's terminal clipboard integration (OSC 52), supported by Windows Terminal; other terminals may require clipboard permission. Use arrows and Enter or click an item; Escape dismisses the menu. Short terminals scroll the menu with the arrow keys or mouse wheel. Close and delete retain their confirmation prompts.
+
+## Harbor model tab and native child terminals
+
+Harbor owns the top bar and right session sidebar. The conversation below remains
+an unmodified native Codex terminal, with its own approvals, login and controls.
+Click **Model** in the top-left bar, or press **F5** from any pane, to open Harbor's
+model picker. Use arrows and Enter or click a model; Escape cancels without
+changing anything. This works independently of sidebar focus or background refresh.
+
+Selecting another model opens a child session in the current conversation's folder,
+mode and topic. An unused matching session is reused; choosing the current running
+model keeps that child. Existing conversations and in-flight work stay untouched
+and can be selected again in the sidebar. This does **not** transfer the current
+conversation's history into a different model's session. The choice also becomes
+the default for new sessions. The top bar shows the visible child's launch choice,
+not a pending sidebar preference or live native `/model` telemetry. Model/service
+errors are displayed in the picker rather than silently closing it.
 
 ## Models and quick project sessions
 
