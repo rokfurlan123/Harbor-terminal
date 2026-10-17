@@ -10,6 +10,8 @@ for setup, updates, missing-sidebar diagnosis, and package verification.
 The complete Trivia / Projects sidebar is included in this repository and Python
 package. Install it on each computer; running plain `codex` does not launch it.
 Requires Python 3.10+, tmux, and an installed, signed-in Codex CLI on the Linux PATH.
+Desktop launchers with a minimal PATH also discover Codex in `~/.local/bin` or
+`~/bin`. `CODEX_WORKSPACE_CODEX` overrides automatic discovery.
 On Ubuntu/WSL, install the packaging prerequisites if needed:
 
 ```bash

@@ -84,6 +84,11 @@ An old script that executes the updated checkout will still work, but the new
 primary command must be `harbor`. Check before replacing any machine-local
 wrapper. The package supplies `codex-workspace` as a compatibility alias.
 
+When a desktop launcher bypasses shell initialization, Harbor also searches
+`~/.local/bin/codex` and `~/bin/codex` if Codex is absent from PATH. For other
+locations set `HARBOR_CODEX` (or `CODEX_WORKSPACE_CODEX`) to the executable's absolute Linux path;
+explicit overrides are honored without fallback. No interactive shell is needed.
+
 On a machine with the old `~/.local/share/codex-workspace/` directory, Harbor
 continues using it automatically. New machines use `~/.local/share/harbor/`.
 Existing named instance sockets retain the `codex-workspace-<name>` spelling for
@@ -233,4 +238,8 @@ launching `harbor` in the default WSL distribution. It does not remove the old
 shortcut. Ask the user before running it or modifying/deleting Windows files.
 A PC's desktop shortcut is not updated merely by pulling Git. Verify Linux
 installation first; then, with permission, run the helper and verify its output.
+Inspect an existing shortcut before changing it: preserve its chosen WSL
+distribution and any explicit Linux PATH that avoids shell-autostart interception.
+The other PC previously used Ubuntu-24.04 with a direct installed-package launch;
+do not replace that with a different distribution or plain Codex.
 Do not install a Windows Python/Node/Codex toolchain for this app.
