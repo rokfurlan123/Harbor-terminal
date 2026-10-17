@@ -556,3 +556,30 @@ sidebars: 9 on strawberry with all 39 other pane IDs/PIDs/conversation mappings
 unchanged, and 3 on the laptop with all 11 other mappings unchanged. No native
 conversation or shared app-server pane was restarted. The existing manual
 qwen/qwen-api launchers are retained independently; Harbor uses its own tunnels.
+
+## 2026-10-18 — Source-PC Tailscale startup recovery
+
+User requested Qwen access from both computers. On strawberry, Harbor 0.2.1
+and its saved `laptop` Tailscale connection were present, but the Linux Tailscale
+daemon was absent; this WSL distro has no systemd init. Direct SSH timed out.
+After the user ran `sudo -b /usr/sbin/tailscaled`, source-PC Harbor test/model
+listing succeeded, reporting local-qwen:latest and qwen3:8b. The existing `qwen`
+SSH launcher returned the actual model reply `QWEN_PC_OK`. Laptop SSH inspection
+confirmed Ollama's installed models and its userspace Tailscale daemon. The
+laptop has an installed Harbor launcher but no `qwen` command in ~/.local/bin;
+non-login SSH also lacks ~/.local/bin on PATH. No credentials were copied.
+
+The source daemon subsequently disappeared again, so those successful checks
+do not establish a durable repair. Added `scripts/setup_wsl_tailscale.py` for
+explicit sudo execution: preserve/back up Linux /etc/wsl.conf, refuse unrelated
+boot hooks/systemd configurations/symlinks, install a root-owned starter using
+start-stop-daemon's background mode, reuse existing Tailscale identity/state,
+and configure startup on future WSL boots. It does not restart WSL, broaden
+access, or interrupt working sessions. Updated the deployment recipe. No
+runtime Harbor behavior or installed package version changed.
+
+Validation: six focused config/atomic-write tests passed; starter shell syntax
+checked. Real privileged installation, durable source-side inference, and
+laptop-local Harbor inference remain pending user execution of the helper.
+No independent reviewer or blind-testing claim. Future-boot behavior remains
+unverified until a user-initiated WSL restart; no restart was performed here.

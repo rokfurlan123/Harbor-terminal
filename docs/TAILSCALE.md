@@ -94,6 +94,33 @@ Harbor reports which stage failed and leaves an existing saved connection
 unchanged on setup failure. It never silently falls back to a cloud model,
 opens a public listener, edits tailnet policy, or disables host-key checking.
 
+### Non-systemd Ubuntu/WSL: daemon disappears after closing a terminal
+
+If `tailscale status` cannot reach its daemon and `ps -C tailscaled` shows no
+process, SSH/model settings cannot repair the missing transport. A manually
+started `sudo -b tailscaled` may still depend on its terminal. For an existing
+Ubuntu Tailscale installation in a **non-systemd** WSL distro, run from this
+checkout:
+
+```bash
+sudo python3 scripts/setup_wsl_tailscale.py
+harbor connections test laptop
+```
+
+The helper preserves `/etc/wsl.conf` settings, saves a dated backup before
+changing it, installs a root-owned detached starter, and adds it as WSL's
+`[boot] command`. It starts the existing `/usr/sbin/tailscaled` now using its
+existing state, without killing another daemon, restarting WSL, or changing
+tailnet access rules. Logs go to `/var/log/harbor-tailscaled.log`. It refuses
+to replace an unrelated boot command or helper. With systemd enabled, use the
+existing Tailscale system service instead: `sudo systemctl enable --now tailscaled`.
+
+This edits Linux configuration only. Future-boot behavior requires an eventual
+user-initiated WSL restart to verify; do not interrupt active conversations to
+test it. A successful startup/model list still needs a separate authorized
+model-reply check. To undo the non-systemd boot hook, restore its reported
+`/etc/wsl.conf.pre-harbor-*` backup after preserving any newer configuration.
+
 ## Verify from the computer that will use the model
 
 Run setup/test/model listing **on the source PC**, not just on the destination.

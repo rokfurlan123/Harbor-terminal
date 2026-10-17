@@ -185,6 +185,10 @@ should list the laptop's models. Stop this diagnostic SSH process afterward;
 Harbor manages its own loopback-only tunnels per operation/conversation.
 The laptop must remain awake with WSL and Ollama running.
 
+The source PC also needs its Linux Tailscale daemon running. For a non-systemd
+WSL installation where a manually started daemon disappears, see the
+[detached startup recovery](TAILSCALE.md#non-systemd-ubuntuwsl-daemon-disappears-after-closing-a-terminal).
+
 ## Other endpoints and model management
 
 ```bash
