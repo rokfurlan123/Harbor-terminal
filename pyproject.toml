@@ -3,19 +3,20 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codex-workspace"
-version = "0.1.0"
-description = "Linux/WSL Codex terminal workspace with a Trivia and Projects sidebar"
+name = "harbor"
+version = "0.2.0"
+description = "Linux/WSL AI workspace with projects and local or remote model connections"
 readme = "README.md"
 requires-python = ">=3.10"
 
 [project.scripts]
-codex-workspace = "codex_workspace.workspace:cli"
+harbor = "harbor.workspace:cli"
+codex-workspace = "harbor.workspace:cli"
 
 [tool.setuptools]
-packages = ["codex_workspace"]
-package-dir = {codex_workspace = "."}
+packages = ["harbor"]
+package-dir = {harbor = "."}
 include-package-data = false
 
 [tool.setuptools.package-data]
-codex_workspace = ["policies/*.md"]
+harbor = ["policies/*.md"]

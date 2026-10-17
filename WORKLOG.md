@@ -1,4 +1,4 @@
-# Codex Workspace — project notes
+# Harbor — project notes
 
 ## 2026-10-16 — Misc topics alongside Trivia and Projects
 
@@ -214,3 +214,75 @@ Added docs/INSTALLATION.md with executable setup/update steps, prerequisite and 
 - Followed project behavioral testing and change-review skills in a code-aware review; no independent testing claim. All 47 unit/integration tests passed using temporary Codex homes/data and isolated tmux sockets. Coverage includes picker scrolling/click/cancel/narrow layouts, catalog failures, reuse/persistence, live-session protection, and native bridge acceptance of Qwen/Ollama. Separately verified actual app-server thread/start returns `qwen3:8b` / `ollama` without a prompt. Model generation and local tool-call quality were not tested.
 - Reloaded only this workspace's sidebar pane after tests, preserving its service and active conversation processes. Existing Linux checkout launcher uses the updated source; no Windows changes or dependency updates.
 - Official reference: https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server (catalog use), plus installed CLI-generated thread/start and thread/resume schemas.
+## 2026-10-17 — Harbor rename and model connections
+
+Renamed the application to **Harbor**, version 0.2.0: sidebar, welcome screen,
+CLI/help/errors, package/module, project display name, developer instructions,
+and optional desktop-shortcut helper. The primary command is `harbor`;
+`codex-workspace` remains an installed compatibility alias. The existing Git
+remote and checkout path remain intact so active sessions and other-PC updates
+keep working. Existing data directories and tmux socket names are retained for
+compatibility; fresh machines use ~/.local/share/harbor. HARBOR_* environment
+aliases are supported alongside the old namespace. Historical worklog entries
+retain their original product names.
+
+Added named connections for direct Ollama, Ollama through authenticated SSH,
+and Responses-compatible model APIs. C / the context menu manages connections
+and lists, loads, unloads, or downloads Ollama models. M selects local, Codex, or
+named-connection models for new sessions or closed saved conversations. Labels
+include the connection ID. SSH forwarding binds only to loopback and is scoped
+to the operation/conversation, with strict host-key checks and noninteractive
+authentication. Native model selection/configuration preserves approval and
+sandbox settings. Missing/deleted connections fail explicitly rather than
+falling back to another provider. Running conversations are not switched.
+
+Connection profiles are private, locked, atomically written JSON in the machine's
+base data directory, separate from instance preferences. They contain API-key
+environment-variable names, never key values. Remote HTTP without TLS and URLs
+with embedded credentials are rejected; loopback HTTP is supported. Model
+requests reject redirects and report authentication/catalog failures without
+printing server response bodies or keys. No public Ollama listener, network ACL
+change, or change to Local AI's authentication was made.
+
+Rewrote docs/INSTALLATION.md with an exact old-package → Harbor migration,
+verification, stale-launcher diagnosis, model-management commands, authenticated
+remote-Qwen setup for the PC, current strawberry-only SSH restriction, and
+optional Windows shortcut steps. The shortcut helper now creates Harbor.lnk,
+but was not run. The other PC was not accessed or upgraded in this session;
+the guide is ready for the agent on that computer. Existing Local AI/Ollama
+services and data were retained.
+
+Validation and review:
+
+- All **62** tests pass, including real native app-server acceptance of custom
+  provider configuration, lifecycle/history regression coverage, connection
+  persistence, credentials/redirect handling, model discovery and management,
+  tunnel failure/cleanup, deleted connections, and native permission preservation.
+- Installed-wheel testing outside the checkout verified help, doctor, model
+  discovery, connection setup, default model selection, HARBOR sidebar startup,
+  and the Connections UI with isolated Codex home/data/tmux sockets.
+- Actual local Qwen inference through Harbor's native conversation launcher
+  produced a saved agent reply `HARBOR_OK`. The test read that reply from the
+  native transcript, closed the disposable conversation, and reopened it with
+  its selected connection and history. Only disposable test history was used.
+  Native onboarding used a synthetic invalid API-key fixture; no live credentials
+  were copied. The model catalog attempted authentication and received 401 for
+  that fixture; inference itself went to local Ollama. A prior isolated Codex
+  exec check also exercised the same custom Responses provider against Qwen.
+- Found and fixed implicit Ollama :latest name matching, menu ordering, clipped
+  connection prompts in narrow sidebars, and malformed remote catalog errors.
+- Behavioral checks and development-aware review were performed by the same
+  implementation-aware agent; no independent/blind review is claimed. A full
+  source-PC → laptop SSH inference test and a real external hosted API provider
+  remain unverified. SSH behavior has command/failure/cleanup coverage, and the
+  other-PC guide explicitly requires testing from that source computer.
+- Built the complete wheel/source archive with isolated Linux build tooling
+  (build 1.6.1, setuptools 84.0.0, wheel 0.48.0); Python 3.12.3, tmux 3.4, and
+  Codex 0.163.0 were used for verification. Runtime has no Python dependencies.
+  System ensurepip is unavailable, so test/install environments used venv
+  --without-pip plus the existing pip --python facility.
+- Installed this laptop's package in ~/.local/share/harbor-app/venv and the
+  primary launcher at ~/.local/bin/harbor. Updated this project's display name
+  in workspace preferences, then reloaded only the sidebar; all other pane IDs
+  and processes were verified unchanged. Shell source/package compatibility,
+  bundled runtime modules/policies, and git diff --check passed.

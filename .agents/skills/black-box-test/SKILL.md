@@ -1,6 +1,6 @@
 ---
 name: black-box-test
-description: Test Codex Workspace user behavior independently from implementation explanations when behavioral validation or an independent review is requested. Not for trivia or general discussion.
+description: Test Harbor user behavior independently from implementation explanations when behavioral validation or an independent review is requested. Not for trivia or general discussion.
 ---
 
 Receive intended behavior, user scenarios, launch instructions, and isolated fixtures. If already exposed to implementation or developer reasoning, disclose that limitation; do not label the review blind. Do not read source, diffs, or WORKLOG.md during an independent pass. Report missing requirements rather than inventing expected behavior.

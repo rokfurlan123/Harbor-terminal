@@ -44,7 +44,7 @@ Reviewed saved conversation user messages and relevant implementation summaries.
 
 Mixed-topic decisions:
 
-- “Explain loop engineering” evolved into implementing Codex Workspace and belongs there, alongside the terminal-resumption and current interface-development chats.
+- “Explain loop engineering” evolved into implementing Harbor (then called Codex Workspace) and belongs there, alongside the terminal-resumption and current interface-development chats.
 - “check guide project” sessions that actually implemented JSON review, ingredient status, or EFSA views belong to bank-information.
 - Cross-project frontend/compliance sessions are grouped under bank-information. Source-registry/pipeline design sessions are grouped under product-scrapper.
 - The advertising-angle discussion explicitly created advertiser, so that is its project.

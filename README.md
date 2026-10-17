@@ -1,6 +1,6 @@
-# Codex Workspace
+# Harbor
 
-A Linux terminal app with the real Codex conversation on the left and a Trivia / Projects session tree on the right. Uses your installed Codex, its existing login, and its own session storage. No Python packages or API key setup required.
+A Linux/WSL AI workspace with local and remote model connections, the real Codex conversation on the left and a Trivia / Projects session tree on the right. Uses your installed Codex, its existing login, and its own session storage. The app uses Python's standard library; external model providers use their own authentication.
 
 ## Install on another computer (Linux/WSL)
 
@@ -28,8 +28,8 @@ pipx ensurepath
 Open a new Linux/WSL terminal, then run:
 
 ```bash
-codex-workspace doctor
-codex-workspace
+harbor doctor
+harbor
 ```
 
 The installed command includes the sidebar, transport, native-session bridge, and
@@ -38,8 +38,7 @@ dependencies. Codex and tmux remain separately installed Linux tools. Sign in to
 Codex separately on each computer. Project folders, conversations, credentials,
 and local preferences are not bundled or synced by installing the app.
 
-To update an existing package installation, run `git pull --ff-only` in the
-checkout followed by `pipx install --force .`.
+To upgrade from Codex Workspace, follow [the Harbor migration guide](docs/INSTALLATION.md#upgrade-codex-workspace-to-harbor). It preserves conversations and preferences; the old command remains an alias.
 
 To build a distributable wheel and source archive:
 
@@ -50,22 +49,22 @@ python3 -m venv .venv
 ```
 
 The files in `dist/` can be copied to another Linux/WSL computer and installed
-with `pipx install /path/to/codex_workspace-0.1.0-py3-none-any.whl`.
+with `pipx install /path/to/harbor-0.2.0-py3-none-any.whl`.
 No files in your Windows installation are modified by these commands.
 
 ## Run from this checkout
 
 ```bash
-/home/rokdbest/bin/codex-workspace
+harbor
 ```
 
 Or run `python3 /home/rokdbest/codex-workspace/workspace.py` in a Linux/WSL terminal. Use a terminal at least 100 columns wide for comfortable viewing. The sidebar uses 33% of the window width and adjusts when the terminal is resized.
 
 Every ordinary launch creates an independent workspace window with its own panes, focus, temporary sessions, and app-server connection. Saved Codex history and login remain shared. Select different conversations in different windows; opening the same saved conversation in both still refers to the same history.
 
-For a workspace you want to reconnect to, use `codex-workspace --instance work` (names accept 1–16 letters, digits, hyphens or underscores). Repeating that command deliberately attaches to the same workspace. Automatically generated instance names and reconnect commands appear on the welcome screen. Use `codex-workspace --instance legacy` to reconnect to the workspace that was running before this change.
+For a workspace you want to reconnect to, use `harbor --instance work` (names accept 1–16 letters, digits, hyphens or underscores). Repeating that command deliberately attaches to the same workspace. Automatically generated instance names and reconnect commands appear on the welcome screen. Use `harbor --instance legacy` to reconnect to the workspace that was running before this change.
 
-New instance settings live under `~/.local/share/codex-workspace/instances/<name>/`. Each starts with a snapshot of the original workspace's preferences, modes, and project assignments, then keeps its own settings. Empty draft sessions are never copied. `CODEX_WORKSPACE_SOCKET` explicitly selects an existing/custom socket and retains the previous launcher behavior for automation; unset it for automatic new instances.
+New instance settings live under `<data-directory>/instances/<name>/`. Each starts with a snapshot of the original workspace's preferences, modes, and project assignments, then keeps its own settings. Empty draft sessions are never copied. `CODEX_WORKSPACE_SOCKET` explicitly selects an existing/custom socket and retains the previous launcher behavior for automation; unset it for automatic new instances.
 
 ## Controls
 
@@ -82,6 +81,7 @@ New instance settings live under `~/.local/share/codex-workspace/instances/<name
 | b / Click Start blank session | Immediately open a fresh session in your Linux home folder, using Auto mode |
 | n | New conversation under the selected category/project; choose mode and, when relevant, project folder |
 | + / Click [+] beside a project | Start a session directly in that project, without setup prompts |
+| C | Manage model connections; list, load, unload, or download Ollama models |
 | M | Choose the selected closed session’s model; on a folder, choose the default for new sessions |
 | m | Change a closed session's mode (also in the right-click menu) |
 | c | Close its terminal after confirmation; retain saved history |
@@ -107,7 +107,7 @@ session. This also works for projects with no saved conversations.
 
 Click the **M Model** line at the top of the sidebar to choose the model for new
 sessions. Use arrows and Enter or click a model; Escape cancels. The picker lists
-the Codex model catalog and models installed in Ollama, including local Qwen.
+the Codex model catalog, models installed in local Ollama, and named model connections, including Qwen on another computer.
 The default is remembered per workspace instance and applies to blank, quick
 project, and guided new sessions. Catalog entries do not guarantee account access.
 Ollama must be installed and running for local discovery and execution; models
@@ -125,6 +125,71 @@ Model selection uses native app-server start/resume fields, keeping the Codex
 approval interface and history. Local model response quality and tool support
 depend on the installed model and Ollama version. Integration checks verify
 selection and native startup without submitting model prompts.
+
+## Model connections and remote Qwen
+
+Press **C** in the sidebar or choose **Connections / manage models** in the
+right-click menu. Add a connection, list its models, and select one with **M**.
+The connection ID appears beside the model so two servers with the same model
+name are distinguishable. Switching a saved conversation requires closing its
+terminal first; running conversations and their tunnels are not changed.
+
+Supported connections:
+
+- **Local Ollama**: automatically discovered; built-in connection ID `local`.
+- **Ollama over SSH**: authenticated forwarding to the other machine's loopback
+  port. Harbor opens and closes the tunnel with the operation or conversation.
+- **Direct Ollama**: loopback HTTP or an HTTPS endpoint you configure.
+- **Responses API**: a compatible server, with an optional API-key environment
+  variable name. Chat-Completions-only servers are not supported by native Codex.
+
+Examples (run on the PC that will use the remote model):
+
+```bash
+# First verify SSH host identity and login normally.
+ssh rokdbest@100.124.226.26 true
+harbor connections add laptop --kind ssh --ssh rokdbest@100.124.226.26
+harbor connections test laptop
+harbor models list --connection laptop
+harbor models use local-qwen --connection laptop
+harbor
+```
+
+Our Qwen host is `strawberry-laptop-linux` (100.124.226.26); its SSH policy
+currently permits only `strawberry` (100.89.111.39), as `rokdbest`. Another PC
+needs its own authorized Tailscale SSH access before this works. The app never
+changes network ACLs or exposes Ollama publicly. The old Local AI web app and
+its access key are separate: Harbor uses SSH to reach Ollama, not that web API.
+
+```bash
+harbor connections add studio --kind responses --url https://models.example.com/v1 --key-env MODEL_API_KEY --models my-model
+harbor connections list
+harbor models load local-qwen --connection local
+harbor models unload local-qwen --connection local
+harbor models pull qwen3:8b --connection local
+harbor models default
+```
+
+Set API keys outside Harbor before launching it; only the environment-variable
+name is stored. Start a fresh workspace after changing authentication variables
+so its app server inherits them. SSH uses your normal Linux SSH configuration,
+strict host-key checking, and noninteractive authentication. Complete any first
+login/host-key check in a terminal; Harbor does not collect passwords.
+
+Load retains a model for ten minutes; unload releases its memory. Download can
+use substantial disk/network resources. The UI asks for confirmation for these
+operations; CLI commands perform the requested operation directly. Unloading a
+shared remote model can affect other users. No models are downloaded on startup.
+
+Connections are saved privately in `connections.json` in the base data directory
+and shared by Harbor instances on that machine. CLI `models use` writes the
+current data directory's default; for an already-open instance, use its **M**
+picker. Removed connections never silently fall back to a cloud provider. API
+catalog discovery is not proof of model/tool compatibility. Explicit model IDs
+for Responses providers are listed as configured, without claiming a live test.
+
+See [installation and other-PC instructions](docs/INSTALLATION.md) for setup,
+troubleshooting, package migration, and the limits of verification.
 
 ## Trivia, projects, and AI modes
 
@@ -168,13 +233,13 @@ Mode instructions take effect when a conversation terminal starts or resumes. Cl
 ## Instruction files
 
 - `policies/auto.md`, `policies/conversation.md`, `policies/project.md`: editable instructions for workspace sessions, applied on their next launch.
-- `AGENTS.md`: rules for developing Codex Workspace itself, including discussion versus implementation.
+- `AGENTS.md`: rules for developing Harbor itself, including discussion versus implementation.
 - `docs/WORKFLOW.md`: development stages and proportionate testing expectations.
 - `.agents/skills/black-box-test/SKILL.md`: independent behavioral testing procedure.
 - `.agents/skills/change-review/SKILL.md`: development-aware review procedure.
 - `WORKLOG.md`: decisions, evidence, and unresolved issues.
 
-These project rules/skills belong to Codex Workspace. Other projects use their own applicable instructions and skills; this update does not create files in every project or change global Codex settings. The testing procedures distinguish fresh-context independent review from code-aware review; installing a skill alone does not schedule or isolate agents.
+These project rules/skills belong to Harbor. Other projects use their own applicable instructions and skills; this update does not create files in every project or change global Codex settings. The testing procedures distinguish fresh-context independent review from code-aware review; installing a skill alone does not schedule or isolate agents.
 
 ## Automatic GitHub repositories and commits
 
@@ -197,7 +262,7 @@ Codex owns the conversation history under `$CODEX_HOME` (normally `~/.codex`). T
 
 New empty sessions are temporary: they appear only while their terminal is open and are excluded from saved-history counts. Creating another session in the same context reuses the open unused one. Closing it, or restarting WSL, discards its placeholder. Once you send a message, Codex owns the saved conversation and reopening uses Codex resume. Local draft records coordinate terminal startup and native thread identity; they are not saved conversation history. Older explicitly named drafts remain available.
 
-Workspace preferences and connection diagnostics live in `~/.local/share/codex-workspace/`. Its `drafts.sqlite` also stores per-session modes and explicit project assignments in separate tables, retained when a draft becomes recorded history. Tree expansion and the project-folder registry are stored in `preferences.json`. Project code stays in its original project folder.
+Harbor uses `~/.local/share/harbor/` for new installations. Existing installations automatically keep `~/.local/share/codex-workspace/` to preserve settings and instance paths. Preferences and connection diagnostics live there. Its `drafts.sqlite` also stores per-session modes and explicit project assignments in separate tables, retained when a draft becomes recorded history. Tree expansion and the project-folder registry are stored in `preferences.json`. Project code stays in its original project folder.
 
 Switching conversations keeps the same terminal process alive. Detaching or closing the terminal window leaves the tmux workspace running while Linux/WSL stays alive. After a computer/WSL restart, run the app and select a saved conversation to resume it. An interrupted command is not automatically restarted. Closing a conversation terminal may interrupt its current work and requires confirmation; it does not delete history.
 
@@ -221,7 +286,7 @@ python3 -m unittest discover -s tests -v
 
 Tests use a temporary Codex home and separate tmux sockets. They cover temporary-session reuse/discard, native-ID handoff, legacy draft persistence and rename, recorded history resume/archive/restore/delete using a synthetic rollout fixture, terminal switching, native login-screen startup, support-process crash recovery, and exact matching of new-thread responses across fragmented WebSocket frames. They do not generate model responses.
 
-A separate manual smoke check has verified native create and close/reopen with the existing login, correct sidebar linking, and the ready prompt. Sending a first real message and receiving model output has not been tested in this workspace yet.
+See WORKLOG.md for the latest native launch and model execution evidence and its limits.
 
 The catalog and native terminals share one Codex app server. `transport.py` implements its WebSocket-over-Unix connection; `bridge.py` links the matching native `thread/start` response to a draft. New and resumed terminals use this bridge to append mode instructions to `thread/start` and `thread/resume`, preserving existing request/configuration developer instructions. It leaves turn requests and permission settings intact and does not submit prompts. The supported instruction field is documented in the [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
 

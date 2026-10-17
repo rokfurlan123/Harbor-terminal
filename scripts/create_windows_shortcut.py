@@ -6,10 +6,10 @@ import subprocess
 script = r'''
 $ErrorActionPreference = 'Stop'
 $desktop = [Environment]::GetFolderPath('Desktop')
-$shortcutPath = Join-Path $desktop 'Codex Workspace.lnk'
+$shortcutPath = Join-Path $desktop 'Harbor.lnk'
 $terminal = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\wt.exe'
 if (-not (Test-Path $terminal)) { throw 'Windows Terminal is not installed.' }
-$arguments = '-w new new-tab --title "Codex Workspace" wsl.exe --cd ~ --exec bash -lic "exec codex-workspace"'
+$arguments = '-w new new-tab --title "Harbor" wsl.exe --cd ~ --exec bash -lic "exec harbor"'
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $terminal

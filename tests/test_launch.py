@@ -39,7 +39,7 @@ class LaunchTests(unittest.TestCase):
                     self.assertNotEqual(manager.main()['pane'],pane)
                     side = next(p for p in manager.panes() if p['thread']=='sidebar')
                     capture = app.tmux('capture-pane','-p','-t',side['pane'])
-                    self.assertIn('CODEX WORKSPACE',capture)
+                    self.assertIn('HARBOR',capture)
                     # Expand the project branch, then select its session.
                     app.tmux('send-keys', '-t', side['pane'], 'Down', 'Down', 'Enter', 'Down')
                     deadline = time.monotonic() + 5

@@ -1,6 +1,6 @@
 ---
 name: change-review
-description: Review Codex Workspace implementation changes against requirements, session invariants, and regression risks. Use for development-aware verification, not casual project discussion.
+description: Review Harbor implementation changes against requirements, session invariants, and regression risks. Use for development-aware verification, not casual project discussion.
 ---
 
 Read requirements, relevant implementation, and test evidence. Trace each material requirement to observable behavior and check failure paths. Prioritize native approval preservation, session identity/persistence, draft-to-thread mapping, subprocess and socket cleanup, shell quoting, and changes that could disturb live work.

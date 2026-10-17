@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A persistent session sidebar around the real Codex terminal UI."""
+"""Harbor: projects, conversations, and local or remote AI models."""
 from __future__ import annotations
 
 import argparse
@@ -17,18 +17,31 @@ import subprocess
 import sys
 import threading
 import time
+import textwrap
 import uuid
 import signal
 import fcntl
 from contextlib import contextmanager
 
+if __package__:
+    from . import connections
+else:
+    import connections
+
+# Honor Harbor names while keeping existing installations and child processes compatible.
+for _setting in ("DATA", "SOCKET", "BASE_DATA", "INSTANCE", "CODEX", "PROJECTS_ROOT"):
+    if "HARBOR_" + _setting in os.environ:
+        os.environ["CODEX_WORKSPACE_" + _setting] = os.environ.pop("HARBOR_" + _setting)
+
 ROOT = Path(__file__).resolve().parent
-DATA = Path(os.environ.get("CODEX_WORKSPACE_DATA", Path.home() / ".local/share/codex-workspace"))
+LEGACY_DATA = Path.home() / ".local/share/codex-workspace"
+DATA = Path(os.environ.get("CODEX_WORKSPACE_DATA", LEGACY_DATA if LEGACY_DATA.exists() else Path.home() / ".local/share/harbor"))
 SOCKET = os.environ.get("CODEX_WORKSPACE_SOCKET", "codex-workspace")
 SESSION = "workspace"
 CODEX = os.environ.get("CODEX_WORKSPACE_CODEX", "codex")
 MODES = {"auto": "Auto", "conversation": "Conversation", "project": "Project work"}
-MODE_MARKER = "\n\n[Codex Workspace mode]\n"
+MODE_MARKER = "\n\n[Harbor mode]\n"
+LEGACY_MODE_MARKER = "\n\n[Codex Workspace mode]\n"
 TOPICS = {"misc": "Misc", "misc/tailscale": "Tailscale",
           "misc/local-models": "Local models", "misc/local-models/qwen": "Qwen"}
 
@@ -136,7 +149,8 @@ def set_session_model(tid, model):
 
 
 def model_label(model):
-    return ("Local · " if model.get("provider") == "ollama" else "") + model.get("model", "Codex default")
+    return ((model["connection"] + " · ") if model.get("connection") else
+            ("Local · " if model.get("provider") == "ollama" else "")) + model.get("model", "Codex default")
 
 
 def available_models(rpc):
@@ -161,7 +175,28 @@ def available_models(rpc):
                            for line in result.stdout.splitlines()[1:] if line.strip())
     except (OSError, subprocess.TimeoutExpired):
         errors.append("Ollama unavailable")
+    for profile in connection_store().all():
+        try:
+            with connections.connect(profile) as endpoint:
+                choices.extend({"provider": "harbor_" + profile["id"], "connection": profile["id"], "model": name}
+                               for name in endpoint.models())
+        except (RuntimeError, OSError, ValueError, KeyError, TypeError) as exc:
+            errors.append(profile["id"] + ": " + str(exc))
     return choices, "; ".join(errors)
+
+
+def connection_store():
+    return connections.Store(Path(os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA))))
+
+
+def connection_operation(name, action, model=None):
+    profile = connection_store().get(name)
+    with connections.connect(profile) as endpoint:
+        if action in ("list", "test"):
+            models = endpoint.models()
+            qualifier = "Configured models (not a live check)" if profile['kind'] == 'responses' and profile.get('models') else "Available models"
+            return qualifier + ": " + (", ".join(models) or "none")
+        return endpoint.manage(action, model)
 
 
 def set_session_project(tid, project):
@@ -194,13 +229,31 @@ def mode_transform(mode, baseline="", model=None):
         existing = params.get("developerInstructions")
         if existing is None:
             existing = (params.get("config") or {}).get("developer_instructions", baseline)
-        existing = (existing or "").split(MODE_MARKER, 1)[0]
+        existing = (existing or "").split(LEGACY_MODE_MARKER, 1)[0].split(MODE_MARKER, 1)[0]
         params["developerInstructions"] = existing + MODE_MARKER + instruction
         if model:
             params["model"] = model["model"]
             params["modelProvider"] = model["provider"]
+            if model.get("provider_config"):
+                overrides = dict(params.get("config") or {})
+                overrides["model_providers." + model["provider"]] = model["provider_config"]
+                params["config"] = overrides
         return request
     return transform
+
+
+def model_launch_args(model):
+    """Select the same provider during native onboarding as during thread start."""
+    if not model:
+        return []
+    args = ['-m', model['model'], '-c', 'model_provider=' + json.dumps(model['provider'])]
+    if model.get('provider_config'):
+        # Provider options are flat strings/bools. JSON strings are valid TOML
+        # basic strings; never include credential values or permission settings.
+        inline = '{' + ','.join(json.dumps(k) + '=' + json.dumps(v)
+                                for k, v in model['provider_config'].items()) + '}'
+        args += ['-c', 'model_providers.' + model['provider'] + '=' + inline]
+    return args
 
 
 def wait_service():
@@ -233,7 +286,7 @@ class Rpc:
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
         try:
-            self.call("initialize", {"clientInfo": {"name": "codex_workspace", "version": "0.1.0"}})
+            self.call("initialize", {"clientInfo": {"name": "harbor", "version": "0.2.0"}})
             self._write({"method": "initialized", "params": {}})
         except Exception:
             self.close()
@@ -668,10 +721,13 @@ class Sidebar:
         while True:
             self.draw()
             h, w = self.screen.getmaxyx()
-            for y in range(max(0, h - 5), h):
+            lines = textwrap.wrap(label, width=max(1, w - 2))[-max(1, h - 4):] or ['']
+            first = max(0, h - 5 - len(lines) + 1)
+            for y in range(first, h):
                 self.screen.move(y, 0)
                 self.screen.clrtoeol()
-            self.put(h - 5, label, curses.A_BOLD)
+            for y, line in enumerate(lines, first):
+                self.put(y, line, curses.A_BOLD)
             self.put(h - 3, "> " + value[-max(1, w - 6):])
             self.put(h - 1, "Enter: accept · Esc: cancel")
             self.screen.refresh()
@@ -734,6 +790,65 @@ class Sidebar:
                 if buttons & (curses.BUTTON1_CLICKED | curses.BUTTON1_RELEASED) and 2 <= y < 2 + min(visible, len(choices)):
                     return choices[offset + y - 2]
 
+    def manage_connections(self):
+        store = connection_store()
+        names = ['local'] + [p['id'] for p in store.all()]
+        self.message = 'Connections: ' + ', '.join(names)
+        action = self.prompt('a Add / t List models / l Load / u Unload / p Download / d Remove')
+        if not action:
+            return
+        name = self.prompt('Connection ID [' + ', '.join(names) + ']')
+        if not name:
+            return
+        if action == 'a':
+            kind = self.prompt('Type: ollama / ssh / responses')
+            if kind is None:
+                return
+            profile = {'id': name, 'kind': kind}
+            if kind == 'ssh':
+                target = self.prompt('SSH target user@hostname')
+                if target is None:
+                    return
+                port = self.prompt('Remote Ollama port [11434]')
+                if port is None:
+                    return
+                profile.update(ssh=target, remote_port=int(port or '11434'))
+            else:
+                url = self.prompt('Base URL (Responses: include /v1; Ollama: no /v1)')
+                if url is None:
+                    return
+                env = self.prompt('API key ENVIRONMENT VARIABLE name [none]')
+                if env is None:
+                    return
+                profile.update(url=url, key_env=env)
+                if kind == 'responses':
+                    models = self.prompt('Model IDs separated by commas [discover /models]')
+                    if models is None:
+                        return
+                    profile['models'] = [m.strip() for m in models.split(',') if m.strip()]
+            connections.validate(profile)
+            if name in names and not self.confirm('Replace connection ' + name + '?'):
+                return
+            store.change(name, profile)
+            self.message = 'Connection saved. Press M to choose a model.'
+        elif action == 'd':
+            store.get(name)
+            if self.confirm('Remove connection ' + name + '? Saved sessions will need another connection.'):
+                store.change(name)
+                self.message = 'Connection removed; running sessions are unchanged.'
+        elif action in ('t', 'l', 'u', 'p'):
+            store.get(name)
+            operation = {'t': 'list', 'l': 'load', 'u': 'unload', 'p': 'pull'}[action]
+            model = None if action == 't' else self.prompt('Model name')
+            if action != 't' and not model:
+                return
+            if action != 't' and not self.confirm(operation.title() + ' ' + model + ' on ' + name + '?'):
+                return
+            self.submit(lambda: connection_operation(name, operation, model),
+                        lambda message: setattr(self, 'message', message), operation.title() + ' on ' + name + '…')
+        else:
+            self.message = 'Choose a, t, l, u, p, or d.'
+
     def apply_model_choice(self, selected, catalog):
         current = session_model(selected["id"]) if selected else preferences().get("new_session_model", {})
         self.screen.timeout(-1)
@@ -782,6 +897,8 @@ class Sidebar:
                 entries.append(("Start session in project", "+"))
             elif self.selected_row().get("topic"):
                 entries.append(("Start session in topic", "+"))
+        entries.insert(len(entries) - 4 if self.selected() else len(entries),
+                       ("Connections / manage models", "C"))
         index = 0
         while True:
             h, w = self.screen.getmaxyx()
@@ -821,7 +938,7 @@ class Sidebar:
     def draw(self):
         self.screen.erase()
         h, w = self.screen.getmaxyx()
-        self.put(0, "CODEX WORKSPACE" + (" · ARCHIVED" if self.archived else ""), curses.A_BOLD | curses.color_pair(1))
+        self.put(0, "HARBOR" + (" · ARCHIVED" if self.archived else ""), curses.A_BOLD | curses.color_pair(1))
         self.put(1, "M Model: " + model_label(preferences().get("new_session_model", {})), curses.A_DIM)
         self.put(2, "/ " + (self.query or "Search conversations"), curses.A_DIM)
         self.put(3, "b  Start blank session", curses.A_BOLD | curses.color_pair(1))
@@ -885,7 +1002,7 @@ class Sidebar:
         self.put(h - 4, "/ Search      r Refresh")
         self.put(h - 3, "D Delete      q Detach")
         self.put(h - 2, "Right-click: menu / copy", curses.A_DIM)
-        self.put(h - 1, "F6 Sidebar  F3 Conversation", curses.A_DIM)
+        self.put(h - 1, "C Connections · F6/F3 focus", curses.A_DIM)
         self.screen.refresh()
 
     def action(self, key):
@@ -941,6 +1058,8 @@ class Sidebar:
                 self.message = "Select a conversation first"
         elif self.future:
             return
+        elif key == "C":
+            self.manage_connections()
         elif key in ("M", "model:default"):
             target = selected if key == "M" else None
             if target and any(p["thread"] == target["id"] and p["dead"] != "1" for p in self.workspace.panes()):
@@ -1104,7 +1223,7 @@ class Sidebar:
                     # Prompts need blocking reads; refresh resumes when they close.
                     self.screen.timeout(-1)
                     self.action(key)
-                except (RuntimeError, OSError, curses.error) as exc:
+                except (RuntimeError, OSError, ValueError, curses.error) as exc:
                     self.message = str(exc)
                 finally:
                     self.screen.timeout(200)
@@ -1115,12 +1234,13 @@ class Sidebar:
 
 
 def welcome():
-    print("\033[2J\033[H\n  CODEX WORKSPACE\n")
+    print("\033[2J\033[H\n  HARBOR\n")
     print("  Your conversations, together in one terminal.\n")
     print("  Click a conversation on the right, or press F6 to select one.")
     print("  Click Start blank session, or press F6 then b, to start immediately.")
     print("  Press n to create a session: Auto, Conversation, or Project work.")
     print("  Press m or right-click to change a closed session's mode.\n")
+    print("  Press M to choose a model; C to manage local or remote connections.\n")
     print("  F2  View warnings in the focused Codex conversation")
     print("  F6  Focus session sidebar")
     print("  F3  Focus conversation")
@@ -1133,13 +1253,25 @@ def welcome():
 
 
 def run_conversation(tid, cwd):
+    model = session_model(tid)
+    if not model.get("connection"):
+        return _run_conversation(tid, cwd)
+    profile = connection_store().get(model["connection"])
+    with connections.connect(profile) as endpoint:
+        # Fail early and keep this tunnel alive until this exact native terminal exits.
+        canonical = endpoint.resolve_model(model["model"])
+        prepared = dict(model, model=canonical, provider="harbor_" + profile["id"], provider_config=endpoint.provider())
+        return _run_conversation(tid, cwd, prepared)
+
+
+def _run_conversation(tid, cwd, prepared_model=None):
     with drafts() as db:
         row = db.execute("SELECT data FROM drafts WHERE id = ?", (tid,)).fetchone()
     draft = json.loads(row[0]) if row else None
     endpoint = DATA / "server.sock"
     is_new = bool(draft and not Path(draft.get("path") or "/nonexistent").exists())
     mode = session_mode(tid)
-    model = session_model(tid)
+    model = prepared_model or session_model(tid)
     rpc = Rpc()
     try:
         config = rpc.call("config/read", {"cwd": cwd, "includeLayers": False})["config"]
@@ -1212,7 +1344,8 @@ def run_conversation(tid, cwd):
 
     worker = threading.Thread(target=forward, daemon=True)
     worker.start()
-    child = subprocess.Popen([CODEX, *([] if is_new else ["resume", tid]), "-C", cwd, "--remote", "unix://" + str(path)])
+    child = subprocess.Popen([CODEX, *([] if is_new else ["resume", tid]), "-C", cwd,
+                              *model_launch_args(model), "--remote", "unix://" + str(path)])
     # The native TUI handles Ctrl-C itself. Closing its pane terminates both
     # processes, including when a terminal disappears during onboarding.
     signal.signal(signal.SIGINT, lambda *_: None)
@@ -1237,8 +1370,8 @@ def run_conversation(tid, cwd):
 def reconnect_command():
     name = os.environ.get("CODEX_WORKSPACE_INSTANCE")
     if name:
-        return "codex-workspace --instance " + shlex.quote(name)
-    return "CODEX_WORKSPACE_DATA=" + shlex.quote(str(DATA)) + " CODEX_WORKSPACE_SOCKET=" + shlex.quote(SOCKET) + " codex-workspace"
+        return "harbor --instance " + shlex.quote(name)
+    return "CODEX_WORKSPACE_DATA=" + shlex.quote(str(DATA)) + " CODEX_WORKSPACE_SOCKET=" + shlex.quote(SOCKET) + " harbor"
 
 
 def select_instance(name=None):
@@ -1269,7 +1402,7 @@ def select_instance(name=None):
     SOCKET = "codex-workspace" if name == "legacy" else "codex-workspace-" + name
     os.environ.update(CODEX_WORKSPACE_BASE_DATA=str(base), CODEX_WORKSPACE_DATA=str(DATA),
                       CODEX_WORKSPACE_SOCKET=SOCKET, CODEX_WORKSPACE_INSTANCE=name)
-    print(f"Workspace instance: {name}. Reconnect with: codex-workspace --instance {name}", flush=True)
+    print(f"Workspace instance: {name}. Reconnect with: harbor --instance {name}", flush=True)
 
 
 def start(detached=False):
@@ -1277,7 +1410,7 @@ def start(detached=False):
         if not shutil.which(executable):
             raise RuntimeError(f"Required Linux tool is missing: {executable}")
     if not detached and not sys.stdin.isatty():
-        raise RuntimeError("Run codex-workspace in an interactive terminal (or use --detached).")
+        raise RuntimeError("Run harbor in an interactive terminal (or use --detached).")
     initialize_projects()
     try:
         tmux("has-session", "-t", SESSION)
@@ -1324,8 +1457,65 @@ def start(detached=False):
     os.execvpe("tmux", ["tmux", "-L", SOCKET, "attach-session", "-t", SESSION], env)
 
 
+def model_cli(argv):
+    parser = argparse.ArgumentParser(prog='harbor ' + argv[0])
+    sub = parser.add_subparsers(dest='action', required=True)
+    if argv[0] == 'connections':
+        sub.add_parser('list', help='List saved connection profiles (no secrets)')
+        add = sub.add_parser('add', help='Add or explicitly replace a named connection')
+        add.add_argument('name')
+        add.add_argument('--kind', choices=['ollama', 'ssh', 'responses'], required=True)
+        add.add_argument('--url')
+        add.add_argument('--ssh')
+        add.add_argument('--remote-port', type=int, default=11434)
+        add.add_argument('--key-env', help='Environment variable NAME, never the key itself')
+        add.add_argument('--models', nargs='*', default=[])
+        add.add_argument('--replace', action='store_true')
+        for action in ('remove', 'test'):
+            sub.add_parser(action).add_argument('name')
+    else:
+        for action in ('list', 'use', 'load', 'unload', 'pull'):
+            cmd = sub.add_parser(action)
+            cmd.add_argument('--connection', default='local')
+            if action != 'list':
+                cmd.add_argument('model')
+        sub.add_parser('default', help='Restore native Codex default for new sessions')
+    args = parser.parse_args(argv[1:])
+    store = connection_store()
+    if argv[0] == 'connections':
+        if args.action == 'list':
+            print(json.dumps([store.get('local'), *store.all()], indent=2))
+        elif args.action == 'add':
+            if any(p['id'] == args.name for p in store.all()) and not args.replace:
+                raise ValueError('Connection exists; use --replace to change it.')
+            profile = {k: v for k, v in vars(args).items()
+                       if k in ('kind', 'url', 'ssh', 'remote_port', 'key_env', 'models') and v is not None}
+            store.change(args.name, dict(profile, id=args.name))
+            print('Connection saved:', args.name)
+        elif args.action == 'remove':
+            store.get(args.name)
+            store.change(args.name)
+            print('Connection removed. Existing sessions may need another model.')
+        else:
+            print(connection_operation(args.name, 'test'))
+    elif args.action == 'default':
+        save_preferences(new_session_model={})
+        print('New sessions: Codex default')
+    elif args.action == 'use':
+        with connections.connect(store.get(args.connection)) as endpoint:
+            canonical = endpoint.resolve_model(args.model)
+        model = {'provider': 'ollama', 'model': canonical} if args.connection == 'local' else {
+            'provider': 'harbor_' + args.connection, 'connection': args.connection, 'model': canonical}
+        save_preferences(new_session_model=model)
+        print('New sessions:', model_label(model))
+    else:
+        print(connection_operation(args.connection, args.action, getattr(args, 'model', None)))
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    if len(sys.argv) > 1 and sys.argv[1] in ("connections", "models"):
+        return model_cli(sys.argv[1:])
+    parser = argparse.ArgumentParser(prog="harbor", description=__doc__)
     parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "doctor"], default="start")
     parser.add_argument("arguments", nargs="*")
     parser.add_argument("--detached", action="store_true", help="Start in the background without attaching")
@@ -1380,8 +1570,8 @@ def main():
 def cli():
     try:
         main()
-    except (RuntimeError, OSError) as exc:
-        print(f"codex-workspace: {exc}", file=sys.stderr)
+    except (RuntimeError, OSError, ValueError) as exc:
+        print(f"harbor: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

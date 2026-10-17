@@ -9,6 +9,9 @@ __pycache__/
 *.sqlite
 *.sqlite-*
 *.log
+connections.json
+connections.lock
+connections.tmp
 
 # Python package build outputs
 build/
