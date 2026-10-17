@@ -60,7 +60,7 @@ No files in your Windows installation are modified by these commands.
 harbor
 ```
 
-Or run `python3 /home/rokdbest/codex-workspace/workspace.py` in a Linux/WSL terminal. Use a terminal at least 100 columns wide for comfortable viewing. The sidebar uses 33% of the window width and adjusts when the terminal is resized.
+Or run `python3 /home/rokdbest/codex-workspace/workspace.py` in a Linux/WSL terminal. Use a terminal at least 100 columns wide for comfortable viewing. The sidebar uses 33% of the window width and adjusts when the terminal is resized. Harbor sets the outer terminal tab title to **Harbor**, including when reconnecting to an existing workspace.
 
 Every ordinary launch creates an independent workspace window with its own panes, focus, temporary sessions, and app-server connection. Saved Codex history and login remain shared. Select different conversations in different windows; opening the same saved conversation in both still refers to the same history.
 

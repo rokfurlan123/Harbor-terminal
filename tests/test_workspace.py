@@ -12,6 +12,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import workspace as app
 
 
+class TitleTests(unittest.TestCase):
+    def test_reattach_sets_harbor_terminal_title_without_restarting_panes(self):
+        with patch.object(app, 'tmux') as tmux, \
+                patch.object(app, 'initialize_projects'), \
+                patch.object(app, 'configure_mouse'), \
+                patch.object(app, 'configure_keys'), \
+                patch.object(app.shutil, 'which', return_value='/usr/bin/tool'), \
+                patch.object(app, 'Workspace') as workspace:
+            workspace.return_value.panes.return_value = [{'thread': 'sidebar', 'pane': '%2'}]
+            app.start(detached=True)
+            tmux.assert_any_call('set-option', '-t', app.SESSION, 'set-titles-string', 'Harbor')
+            tmux.assert_any_call('set-option', '-t', app.SESSION, 'set-titles', 'on')
+            self.assertFalse(any(call.args[0] in ('kill-pane', 'respawn-pane', 'kill-session')
+                                 for call in tmux.call_args_list))
+
+
 class PersistenceTests(unittest.TestCase):
     """Real Codex RPC, with an isolated home and no model generation."""
 

@@ -1458,6 +1458,10 @@ def start(detached=False):
         except Exception:
             tmux("kill-session", "-t", SESSION)
             raise
+    # Set a stable outer terminal tab title, including when reattaching to an
+    # older workspace. Do not let native conversation pane titles replace it.
+    tmux("set-option", "-t", SESSION, "set-titles-string", "Harbor")
+    tmux("set-option", "-t", SESSION, "set-titles", "on")
     Workspace().repair()
     configure_mouse()
     sidebar = next(p["pane"] for p in Workspace().panes() if p["thread"] == "sidebar")

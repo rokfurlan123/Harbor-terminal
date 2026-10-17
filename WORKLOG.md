@@ -414,3 +414,14 @@ are covered. git diff --check passed. Reinstalled Harbor 0.2.0 using pipx and
 verified CLI help. Reloaded only this workspace's sidebar; conversation panes
 were not restarted. Live model switching across providers is not implemented;
 choices apply at next launch as before, but no longer require closing first.
+
+## 2026-10-17 — Harbor terminal tab title
+
+Startup and reattach now configure tmux set-titles-string=Harbor and set-titles=on
+for the workspace session, keeping the outer terminal title stable instead of
+inheriting legacy or conversation names. Applied both options to the current
+live instance and read them back successfully; no conversation panes restarted
+and no Windows files changed. Terminal rendering remains client-dependent.
+README updated. Added a reattach regression check including no pane restart.
+All 65 tests passed outside the socket-restricted sandbox; git diff --check passed.
+Reinstalled the Linux pipx package for future launches.
