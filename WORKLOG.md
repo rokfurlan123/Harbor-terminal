@@ -547,3 +547,12 @@ Validation:
 - Pulled seven incoming PC commits before implementation, preserving the
   existing model toolbar, pending-model preferences, and installation history.
   No Windows files, launchers, or toolchains were changed.
+
+Deployment completion: feature commit 7838c10 was pushed to the existing private
+GitHub remote and the clean PC checkout fast-forwarded to it. The installed
+0.2.1 wheel was refreshed with the reviewed storage/daemon-recovery fixes;
+source-PC connection test and model listing passed again. Refreshed only support
+sidebars: 9 on strawberry with all 39 other pane IDs/PIDs/conversation mappings
+unchanged, and 3 on the laptop with all 11 other mappings unchanged. No native
+conversation or shared app-server pane was restarted. The existing manual
+qwen/qwen-api launchers are retained independently; Harbor uses its own tunnels.
