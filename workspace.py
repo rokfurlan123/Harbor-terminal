@@ -25,9 +25,9 @@ import getpass
 from contextlib import contextmanager
 
 if __package__:
-    from . import connections
+    from . import connections, local_runtime
 else:
-    import connections
+    import connections, local_runtime
 
 # Honor Harbor names while keeping existing installations and child processes compatible.
 for _setting in ("DATA", "SOCKET", "BASE_DATA", "INSTANCE", "CODEX", "PROJECTS_ROOT"):
@@ -238,7 +238,14 @@ def project_for(thread):
 
 def uses_ollama(model):
     """Use verified connection metadata, not a model name or URL guess."""
-    return bool(model and (model.get("provider") == "ollama" or model.get("backend") == "ollama"))
+    return local_runtime.enabled(model)
+
+
+def model_config(model):
+    overrides = local_runtime.overrides(model)
+    if model and model.get('provider_config'):
+        overrides['model_providers.' + model['provider']] = model['provider_config']
+    return overrides
 
 
 def mode_transform(mode, baseline="", model=None):
@@ -253,17 +260,12 @@ def mode_transform(mode, baseline="", model=None):
         if existing is None:
             existing = (params.get("config") or {}).get("developer_instructions", baseline)
         existing = (existing or "").split(LEGACY_MODE_MARKER, 1)[0].split(MODE_MARKER, 1)[0]
-        params["developerInstructions"] = existing + MODE_MARKER + instruction
+        params["developerInstructions"] = existing + MODE_MARKER + instruction + local_runtime.facts(model)
         if model:
             params["model"] = model["model"]
             params["modelProvider"] = model["provider"]
             overrides = dict(params.get("config") or {})
-            if model.get("provider_config"):
-                overrides["model_providers." + model["provider"]] = model["provider_config"]
-            if uses_ollama(model):
-                # Ollama's built-in search needs its cloud service. Never enable
-                # cloud access just to make an otherwise local conversation work.
-                overrides["web_search"] = "disabled"
+            overrides.update(model_config(model))
             if overrides:
                 params["config"] = overrides
         return request
@@ -275,14 +277,8 @@ def model_launch_args(model):
     if not model:
         return []
     args = ['-m', model['model'], '-c', 'model_provider=' + json.dumps(model['provider'])]
-    if uses_ollama(model):
-        args += ['-c', 'web_search="disabled"']
-    if model.get('provider_config'):
-        # Provider options are flat strings/bools. JSON strings are valid TOML
-        # basic strings; never include credential values or permission settings.
-        inline = '{' + ','.join(json.dumps(k) + '=' + json.dumps(v)
-                                for k, v in model['provider_config'].items()) + '}'
-        args += ['-c', 'model_providers.' + model['provider'] + '=' + inline]
+    for key, value in model_config(model).items():
+        args += ['-c', key + '=' + local_runtime.toml(value)]
     return args
 
 
@@ -1400,6 +1396,10 @@ def run_conversation(tid, cwd):
         canonical = endpoint.resolve_model(model["model"])
         prepared = dict(model, model=canonical, provider="harbor_" + profile["id"], provider_config=endpoint.provider(),
                         backend="responses" if profile["kind"] == "responses" else "ollama")
+        if profile['kind'] in ('ssh', 'tailscale'):
+            prepared['inference'] = 'Ollama on ' + profile['ssh'].split('@', 1)[1] + '; encrypted SSH tunnel from this Harbor computer'
+        else:
+            prepared['inference'] = 'Ollama at ' + profile.get('url', '')
         return _run_conversation(tid, cwd, prepared)
 
 

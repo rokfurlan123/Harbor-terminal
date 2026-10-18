@@ -660,3 +660,96 @@ Validation and deployment:
 - Syntax and whitespace checks passed. Applied behavioral and development-aware
   review perspectives in this implementation-aware session; no independent
   agent/blind-review claim. No Windows files or tailnet policy changed.
+
+## 2026-10-18 — Compact, instruction-aware Qwen with practical tools (0.2.3)
+
+User requested better Qwen answers and usable internet/tooling, rather than
+more statements about tool inventories. Kept the installed 8B model; this is
+integration/context/prompt tuning, not training or a model-capacity upgrade.
+
+Investigation found two concrete problems:
+
+1. local-qwen had a 2,048-token model profile despite the native tool/instruction
+   payload. Laptop hardware is RTX 3060 Laptop, 6,144 MiB VRAM, about 7.6 GiB WSL
+   RAM. Increased the profile to 8,192 tokens in the separate local-ai project.
+   Real Ollama placement was 100% GPU, 8,192 context, about 5.6 GB loaded;
+   nvidia-smi reported 5,587 MiB used. No larger weights were downloaded and no
+   service/Windows memory setting was changed. Browser harness explicit 4K and
+   global service fallback 2K remain unchanged.
+2. The upstream Qwen3 Go template silently discards developer-role messages.
+   A controlled Responses call ignored a synthetic developer fact (empty reply)
+   but honored the same system fact (`HARBOR_TEST_HOST`). This matches upstream
+   https://github.com/ollama/ollama/issues/18305. Consequently merely adding more
+   instructions in Harbor would not fix behavior. The laptop's tracked
+   local-ai Modelfile now preserves developer messages as instruction-bearing
+   system messages, without changing user/tool/assistant handling. Its opt-in
+   real-model regression now returns the exact marker. Changes and verification
+   are recorded in that repository's docs/WORKLOG.md.
+
+Harbor changes:
+
+- Added a compact Ollama instruction file and shared per-conversation runtime
+  configuration used by native launch and thread start/resume. Context budget
+  is 8K with early compaction. Preserve developer baseline, AGENTS instructions,
+  mode, native sandbox/approvals, credentials and saved history. Deployment facts
+  distinguish remote inference, the Harbor client and tool execution location.
+- Omit goals, hosted apps/tool suggestions, subagents and image tools from this
+  small text-model profile. Native shell/file work remains under the existing
+  native permissions; no bypass flags or autonomous side-effect runner added.
+  OpenAI and generic Responses configurations remain unchanged.
+- Added a bundled stdio MCP server with two read-only tools: public web search
+  (Bing RSS, no key) and public text-page fetch. Native tool events confirm real
+  execution. It is separate from disabled Ollama cloud search/inference. Queries
+  and URLs leave the client for external websites; never include secrets.
+- HTTP(S) standard ports only, no user credentials/cookies/proxy forwarding,
+  private/loopback/tailnet/metadata/multicast/reserved IP rejection, redirect
+  revalidation and pinned DNS addresses with normal TLS verification. Limit
+  downloads to 1 MiB and excerpts to 6K characters, bound I/O and reject binary
+  downloads. Tool errors and rate-limit/blocked-service failures are surfaced.
+  No file or shell API in the web server. HARBOR_OLLAMA_WEB=0 disables it for
+  newly opened local-model terminals. Web results are marked untrusted data.
+
+Validation:
+
+- **103 tests passed** in 33.834 seconds. Native fixture now advertises and
+  executes a namespaced MCP call end-to-end, returning a private-address denial
+  into the next model request. It also proves hosted search is unchanged and
+  local cloud search omitted. Fixture development initially used an incorrect
+  flattened function name; corrected it to the native namespace/name format.
+- New unit/protocol checks cover URL and DNS/private-address rejection, pinned
+  connection addresses, private redirects, binary/oversized download rejection,
+  HTML/script extraction, text bounds, search parsing, MCP errors, TOML round
+  trips, web opt-out, non-accumulating runtime facts and hosted-provider isolation.
+- Installed-package native CLI acceptance completed on **both computers** with
+  disposable CODEX_HOME/cwd, synthetic onboarding credentials and read-only
+  sandboxing. Each ran deployment questions, actual public example.com fetch,
+  actual search with source links, and pwd through the native shell. Completed
+  MCP fetch/search and shell events, not model claims, establish tool access.
+  Saved-thread resume was exercised between questions. No live chats were used
+  as fixtures or restarted. Native TUI lifecycle remains covered by the suite.
+- Final installed-package native **Harbor TUI/bridge/shared-server** acceptance
+  also passed with a disposable home/data/tmux socket, synthetic onboarding,
+  and only the empty test folder trusted. Typed a public example.com fetch;
+  native thread/read returned a completed harbor_web MCP fetch and the saved
+  `Example Domain` agent reply. Closed/reopened only that disposable terminal
+  and verified the saved reply remained. The UI harness needed the current
+  trust-prompt wording and a paste delay before Enter; no production trust or
+  approval setting was changed. Only the isolated test tmux server was stopped.
+- The initial identity test still guessed from tools until the model-template
+  repair; afterward it used runtime facts and rejected Alibaba-cloud hosting.
+  Search relevance and exact inference/client wording can still be imperfect.
+  Long conversations can compact repeatedly and drift on this small model;
+  advise a fresh focused chat, not stronger guarantees of intelligence.
+- local-ai's **23 tests passed** in 8.041 seconds; its opt-in developer marker
+  test passed. No harness backend, app auth or user approvals changed.
+- Built wheel/source archive using existing Linux tooling; verified inclusion
+  of local_runtime.py, web_tools.py, all runtime modules and policies/ollama.md.
+  Installed 0.2.3 into PC pipx and laptop harbor-app environments without
+  restarting active sessions. Syntax/whitespace checks passed. Behavioral and
+  development-aware reviews were implementation-aware; no independent review
+  or agent delegation is claimed. No Windows files or protected C:\private paths
+  were accessed.
+
+Fresh Qwen terminals load the new configuration. Start a fresh conversation
+after closing the affected terminal rather than reinforcing the old tool-only
+replies; saved history remains untouched. Other providers keep their settings.

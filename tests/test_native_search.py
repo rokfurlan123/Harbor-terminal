@@ -27,6 +27,28 @@ class SearchRequestTests(unittest.TestCase):
                                 'status': 'completed', 'content': [{
                                     'type': 'output_text', 'text': 'HELLO_FIXTURE', 'annotations': []}]}],
                             'usage': {'input_tokens': 1, 'output_tokens': 1, 'total_tokens': 2}}
+                if backend == 'ollama' and len(calls) == 1:
+                    def names(value, prefix=''):
+                        if isinstance(value, dict):
+                            if isinstance(value.get('name'), str):
+                                yield prefix + value['name']
+                            if value.get('type') == 'namespace':
+                                for tool in value.get('tools', []):
+                                    yield from names(tool, value['name'] + '.')
+                                return
+                            for nested in value.values():
+                                yield from names(nested, prefix)
+                        elif isinstance(value, list):
+                            for nested in value:
+                                yield from names(nested, prefix)
+                    tool = next((name for name in names(calls[-1].get('tools', []))
+                                 if 'harbor_web' in name and name.endswith('fetch')), None)
+                    if tool:
+                        namespace, _, name = tool.rpartition('.')
+                        response['output'] = [{'id': 'fc_fixture', 'type': 'function_call',
+                                               'call_id': 'call_fixture', 'status': 'completed',
+                                               'name': name or tool, 'namespace': namespace or None,
+                                               'arguments': '{"url":"http://127.0.0.1/private"}'}]
                 events = [
                     {'type': 'response.created', 'response': dict(response, status='in_progress', output=[])},
                     {'type': 'response.output_item.done', 'output_index': 0, 'item': response['output'][0]},
@@ -61,6 +83,13 @@ class SearchRequestTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
                 self.assertIn('HELLO_FIXTURE', result.stdout)
                 self.assertTrue(calls, result.stdout)
+                if backend == 'ollama':
+                    self.assertGreaterEqual(len(calls), 2, result.stdout + result.stderr)
+                    self.assertIn('not allowed', json.dumps(calls[-1].get('input')))
                 for request in calls:
                     has_search = any(t.get('type', '').startswith('web_search') for t in request.get('tools', []))
                     self.assertEqual(has_search, backend == 'responses', request.get('tools'))
+                    if backend == 'ollama':
+                        tools = json.dumps(request.get('tools'))
+                        self.assertIn('harbor_web', tools)
+                        self.assertNotIn('create_goal', tools)

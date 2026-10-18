@@ -161,6 +161,25 @@ terminal to apply the fix while retaining its history. Existing terminals are
 never restarted automatically. Model claims about their hosting are not runtime
 evidence; check the selected connection and server instead.
 
+Harbor 0.2.3 adds a compact Ollama assistant profile: fewer irrelevant tools,
+an 8,192-token client context budget, explicit deployment facts, and read-only
+public-web **search** and **fetch** tools through the bundled `harbor_web` MCP
+server. Shell/file work continues through native tools and permissions. No
+Ollama cloud account or paid search key is used; queries go to Bing's public
+RSS search and fetched URLs go to their websites. Public-web tools do not read
+local/private addresses, files, credentials or browser cookies. They cannot
+execute JavaScript or handle PDF/binary downloads. Search availability and
+relevance are best-effort; output remains untrusted data. Set
+`HARBOR_OLLAMA_WEB=0` before launching a new Qwen terminal to disable this server.
+
+The model host must also support that context and preserve developer messages.
+Our laptop's `local-qwen` profile has been adjusted separately in the
+`local-ai` project; the stock Qwen3 template was silently dropping these
+instructions. Start a fresh Qwen conversation after updating both components,
+especially if the old conversation contains repeated tool-inventory replies.
+This improves usable context and tool access, not the model's 8B parameter
+capacity. Long conversations and difficult tasks can still exceed its limits.
+
 ## Model connections and remote Qwen
 
 Press **C** in the sidebar or choose **Connections / manage models** in the

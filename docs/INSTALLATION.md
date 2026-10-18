@@ -195,6 +195,45 @@ reopened. A model saying it is hosted in Alibaba's cloud is not deployment
 telemetry; the selected endpoint and loaded Ollama model determine inference
 location. This fix does not make model self-descriptions reliable.
 
+### Compact local assistant and internet tools (0.2.3)
+
+Update Harbor on both client computers. Ollama conversations now use bundled
+`local_runtime.py`, `policies/ollama.md`, and `web_tools.py`. The native launch
+and thread start/resume share the same configuration: 8,192-token client
+context, early compaction, no cloud search, and a small public-web MCP server.
+Goal management, hosted apps/tool suggestions, subagents and image tools are
+omitted from this text-model profile to reduce schema noise. OpenAI and generic
+Responses profiles are unchanged. Existing user/developer instructions,
+permissions, shell approvals and conversations are not discarded or restarted.
+
+`harbor_web.search` uses Bing public RSS results; `harbor_web.fetch` reads
+public HTTP(S) pages as bounded text. These tools send user-chosen queries/URLs
+to external websites. Never put secrets in them. No API key, cookie, paid
+service, hosted inference fallback, or persistent browser session is added.
+HTTP(S) uses standard ports only; DNS and redirects are checked for non-public
+addresses, and connections are pinned to the checked IPs with verified TLS.
+Loopback, RFC1918, Tailscale and metadata addresses and file URLs are rejected.
+Downloads are limited to 1 MiB and page excerpts to 6,000 characters. Binary
+documents, JavaScript sites, rate limits and blocked search services may fail;
+the tool reports errors rather than inventing results. This is not a universal
+browser. To opt out, launch with `HARBOR_OLLAMA_WEB=0` and reopen the Qwen terminal.
+
+**Model-host prerequisite:** the laptop's `~/local-ai/Modelfile` now sets
+`num_ctx 8192` and retains developer-role messages as instruction-bearing
+messages in its Qwen3 template. Recreate with `~/.local/bin/ollama create
+local-qwen -f ~/local-ai/Modelfile` after model-profile changes. This reuses
+installed weights; do not download another model or restart the service just
+to apply the profile. Service defaults and the separate browser harness's
+explicit 4K requests are unchanged. Verify with `ollama ps` after a Harbor turn.
+An unmodified model template that ignores developer messages also ignores
+mode instructions and runtime facts, regardless of context size. See
+[upstream diagnosis](https://github.com/ollama/ollama/issues/18305).
+
+Start a **fresh** Qwen conversation to avoid reinforcing previous bad replies.
+Verify ordinary chat, the hosting question, a real public-page fetch, a search,
+and a read-only shell/file task. Do not infer tool success from the model merely
+saying it has internet access; inspect completed native tool events.
+
 The source PC also needs its Linux Tailscale daemon running. For a non-systemd
 WSL installation where a manually started daemon disappears, see the
 [detached startup recovery](TAILSCALE.md#non-systemd-ubuntuwsl-daemon-disappears-after-closing-a-terminal).
@@ -255,7 +294,8 @@ instances in the machine's base data directory; no credentials are synced.
 ## Package and Windows shortcut maintenance
 
 The wheel must include the `harbor` package's `workspace.py`, `connections.py`,
-`bridge.py`, `transport.py`, `tailscale_support.py`, `__init__.py`, and all three mode policies. Both
+`bridge.py`, `transport.py`, `tailscale_support.py`, `local_runtime.py`, `web_tools.py`,
+`__init__.py`, all three mode policies and `policies/ollama.md`. Both
 `harbor` and the old `codex-workspace` command must work outside the checkout.
 The source archive also includes docs, scripts, tests and project skills.
 
