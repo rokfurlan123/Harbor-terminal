@@ -753,3 +753,39 @@ Validation:
 Fresh Qwen terminals load the new configuration. Start a fresh conversation
 after closing the affected terminal rather than reinforcing the old tool-only
 replies; saved history remains untouched. Other providers keep their settings.
+
+## 2026-10-19 — Reconcile GitHub and verify this machine's installation
+
+User requested comparison/reconciliation, tests, push, and local installation.
+Fetched the existing origin and compared main against origin/main: clean worktree,
+zero local-only or remote-only commits, both at 0252ed6. No merge, rebase, reset,
+application change, or version bump was needed; Harbor remains 0.2.3.
+
+Validation and installation:
+
+- Full suite: `python3 -m unittest discover -s tests -v` — **103 tests passed**
+  in 33.972 seconds, including isolated native terminal/sidebar, session lifecycle,
+  model configuration, compact Ollama runtime and public-web tool fixtures.
+- Built wheel and source archive. Verified the wheel contains all eight runtime
+  modules and all four mode/runtime policy files. Build tooling is Linux-only:
+  Python 3.12.3; project `.venv/bin/python`; build 1.6.1, packaging 26.3,
+  pyproject_hooks 1.3.3; isolated build backend setuptools 84.0.0.
+- Installed wheel into a disposable environment and checked both command aliases
+  from outside the checkout, connections listing and doctor. Isolated detached
+  sidebar verified HARBOR, Trivia and Projects, and doctor reported Codex connected
+  with zero saved conversations. The sidebar smoke required execution outside
+  the sandbox for tmux socket access; only its unique test socket was stopped.
+- Reinstalled the wheel with `pipx install --force ... --pip-args=--no-deps`.
+  Installed Harbor 0.2.3 matches every checkout runtime module and policy byte for
+  byte; both command aliases resolve and display help.
+- Real installed `harbor doctor`, outside the sandbox, reported Codex connection
+  OK and 119 saved conversations. No real conversations were used as fixtures,
+  stopped or restarted; no preferences, login or approvals were changed.
+- Remaining environment limitation: default/local model discovery cannot reach
+  local Ollama. Explicit discovery through saved `laptop` reports
+  strawberry-laptop-linux offline in Tailscale. Wake the laptop and connect its
+  Linux Tailscale client before using that model. No inference prompts were sent,
+  and no live model availability or fresh model-response acceptance is claimed.
+- `git diff --check` passed. This is an implementation-aware maintenance check,
+  not independent black-box review. No subagents, Windows edits, or protected
+  private-directory access occurred. Only this maintenance record changes Git.
