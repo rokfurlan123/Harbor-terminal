@@ -789,3 +789,25 @@ Validation and installation:
 - `git diff --check` passed. This is an implementation-aware maintenance check,
   not independent black-box review. No subagents, Windows edits, or protected
   private-directory access occurred. Only this maintenance record changes Git.
+
+## 2026-10-20 — Local GPT-OSS model available in Harbor
+
+User requested adding the newly installed GPT-OSS 20B to Harbor's model list.
+The existing local Ollama discovery already handles it; no source, package,
+connection profile, model default, or conversation changes were necessary.
+
+- Installed `harbor models list --connection local` reports `gpt-oss:20b`.
+- Exercised the installed package's `available_models` and `model_label` with
+  isolated temporary CODEX_HOME/Harbor data/socket settings, a stubbed empty
+  Codex catalog, and real local Ollama discovery. Verified the exact picker
+  entry **Local · gpt-oss:20b**, with no discovery warnings. No remote endpoint,
+  model inference, or live conversation was used as a test fixture.
+- `harbor models default` still reports **Codex default**. Existing terminals
+  and saved model selections were not restarted or modified. Open/reopen F5
+  to discover the entry, then select it explicitly when desired.
+- This resolves the local-Ollama-unavailable limitation recorded on October 19;
+  remote laptop availability was not retested. Runtime installation and GPU
+  smoke evidence are documented separately in `~/local-ai/README.md`.
+- Focused discovery checks suffice: no application behavior changed. README's
+  existing automatic-discovery instructions remain accurate. No Windows or
+  protected private-directory access occurred.
