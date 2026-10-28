@@ -1,4 +1,9 @@
-# Harbor
+# Harbor Terminal
+
+The terminal edition lives in **Harbor-terminal**. The separate native Linux/WSL
+Rinf (Rust + Flutter) desktop application is developed in
+[harbor](https://github.com/rokfurlan123/harbor). Existing `harbor` and
+`codex-workspace` commands and data remain unchanged.
 
 A Linux/WSL AI workspace with local and remote model connections, the real Codex conversation on the left and a Trivia / Projects session tree on the right. Uses your installed Codex, its existing login, and its own session storage. The app uses Python's standard library; external model providers use their own authentication.
 
@@ -40,8 +45,8 @@ sudo apt-get install python3-venv pipx tmux git
 Clone this private repository using your GitHub account, then install:
 
 ```bash
-git clone git@github.com:rokfurlan123/codex-workspace.git
-cd codex-workspace
+git clone git@github.com:rokfurlan123/Harbor-terminal.git
+cd Harbor-terminal
 pipx install .
 pipx ensurepath
 ```

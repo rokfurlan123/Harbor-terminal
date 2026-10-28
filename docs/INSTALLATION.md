@@ -12,8 +12,10 @@ Check `command -v harbor`, `command -v codex-workspace`, `command -v codex`,
 `python3 --version`, `tmux -V`, and `pipx list`. Python 3.10+ is required.
 Codex and its sign-in are installed separately on each computer.
 
-The private repository remains
-`https://github.com/rokfurlan123/codex-workspace` to preserve existing remotes.
+The repository is now
+`https://github.com/rokfurlan123/Harbor-terminal` (renamed at the user’s request).
+GitHub redirects old links; update existing checkout remotes with
+`git remote set-url origin git@github.com:rokfurlan123/Harbor-terminal.git`.
 Existing checkout directories may retain that name. The installed application,
 package, command, sidebar, and new shortcut are Harbor. Do not move an active
 checkout or change Git remotes just to update its display name.
@@ -35,8 +37,8 @@ Preserve a working Codex installation. If it is missing, follow current official
 Codex Linux installation instructions. Then clone/install this private app:
 
 ```bash
-git clone git@github.com:rokfurlan123/codex-workspace.git
-cd codex-workspace
+git clone git@github.com:rokfurlan123/Harbor-terminal.git
+cd Harbor-terminal
 pipx install .
 pipx ensurepath
 harbor --help

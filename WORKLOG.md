@@ -979,3 +979,14 @@ commit `d6ed662` was pushed successfully to the existing private GitHub remote;
 the clean laptop checkout fast-forwarded and its global harbor-hub skill was
 installed too. Both machines now retain the project architecture and maintenance
 instructions. Final follow-up commit is pushed/synced using the same workflow.
+
+
+## 2026-10-28 — Split terminal and native desktop repositories
+
+Renamed GitHub codex-workspace to Harbor-terminal at the user’s explicit request,
+preserving public visibility, history and branch; updated this checkout’s origin.
+Kept the active checkout path and installed commands/data unchanged so ongoing
+sessions are not interrupted. Updated clone instructions. New private harbor
+repository is for Linux/WSL Rinf (Rust + Flutter); not a replacement install yet.
+Verification: GitHub repo identity/visibility and origin checked; documentation-only
+change, git diff --check. No runtime restart or inference.
