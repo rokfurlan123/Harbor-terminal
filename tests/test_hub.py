@@ -144,6 +144,19 @@ class HubTests(unittest.TestCase):
         fake.select_instance.assert_not_called()
         fake.save_preferences.assert_not_called()
 
+    def test_sidebar_empty_catalog_does_not_open_empty_picker(self):
+        side = app.Sidebar(Mock())
+        self.addCleanup(side.pool.shutdown)
+        side.prompt = Mock(side_effect=['local', 'codex'])
+        side.choose_model = Mock()
+        side.submit = lambda job, done, message: done(job())
+        empty = dict(self.codex(), models=[])
+        with patch.object(hub, 'hosts', return_value=[{'id': 'local'}]), \
+                patch.object(hub, 'catalog', return_value={'backends': [empty]}):
+            side.open_hub()
+        side.choose_model.assert_not_called()
+        self.assertIn('No models reported', side.message)
+
     def test_sidebar_cancel_and_local_selection_do_not_touch_running_sessions(self):
         side = app.Sidebar(Mock())
         self.addCleanup(side.pool.shutdown)

@@ -968,3 +968,14 @@ Verification:
 Open a fresh local Harbor window for H; existing sidebar processes retain loaded
 code and existing conversation terminals keep their loaded settings. Remote
 sessions remain host-owned, not merged/copied into the source's conversation DB.
+
+Final review/deployment follow-up: an empty backend catalog could reach the
+existing nonempty-only model picker; added an explicit no-models message without
+launch/fallback, plus a regression test. Final full suite: **127 tests passed**
+in 35.176 s (14 hub tests); installed isolated sidebar/auth smoke passed again.
+Rebuilt/reinstalled the final wheel on both ends; laptop temporary installer now
+at `/tmp/harbor-hub-install-u5rye1cg/pip.pyz` (pip 26.2.2). Initial implementation
+commit `d6ed662` was pushed successfully to the existing private GitHub remote;
+the clean laptop checkout fast-forwarded and its global harbor-hub skill was
+installed too. Both machines now retain the project architecture and maintenance
+instructions. Final follow-up commit is pushed/synced using the same workflow.

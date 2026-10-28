@@ -1158,6 +1158,9 @@ class Sidebar:
                 found = next((b for b in report['backends'] if b['id'] == backend), None)
                 if not found:
                     raise ValueError('Choose a listed backend.')
+                if not found['models']:
+                    self.message = 'No models reported by ' + backend + ' on ' + host + '; no fallback.'
+                    return
                 model = self.choose_model({}, ([{'model': m} for m in found['models']], 'Execution: ' + host + ' / ' + backend))
                 if model is None:
                     return
