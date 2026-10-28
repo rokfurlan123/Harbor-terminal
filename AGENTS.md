@@ -13,3 +13,16 @@ For authorized implementation work on this project, follow the Automatic GitHub 
 For installation, updates, packaging, another-computer setup, or a missing Trivia / Projects sidebar, read docs/INSTALLATION.md first and carry out the applicable steps. The sidebar belongs to this custom app, launched with `harbor` (`codex-workspace` remains an alias), not plain `codex`. Keep the complete app installable from this repository; do not rely on `/home/rokdbest/bin` or other machine-local launchers. Preserve both installed-package and direct-checkout execution. Include all runtime modules and mode policies when packaging. Record setup/verification results in WORKLOG.md and push authorized project changes to the existing remote.
 
 For Tailscale model connections, follow docs/TAILSCALE.md. Keep device discovery, authenticated SSH, endpoint checks, and saved selection separate; never claim source-side success from destination-only tests.
+
+## Hub architecture and connection maintenance
+
+Harbor is an extensible hub: execution host × backend × discovered model. Follow
+`docs/HUB.md` and `.agents/skills/harbor-hub/SKILL.md` for installation, adding
+providers/machines, authentication, updates and reconnection. Keep host and
+inference connection stores separate, use adapter interfaces, and support
+arbitrary profile counts without hardcoded machines or model IDs. Native agent
+backends and inference endpoints are different capabilities; do not imply a
+subscription is an API entitlement. Preserve per-host sign-in, approvals and
+history. No credential copying, public listeners, or silent host/provider
+fallback. Verify on the source and state whether only catalogs or actual
+inference were tested.

@@ -303,7 +303,7 @@ instances in the machine's base data directory; no credentials are synced.
 
 The wheel must include the `harbor` package's `workspace.py`, `connections.py`,
 `bridge.py`, `transport.py`, `tailscale_support.py`, `local_runtime.py`, `web_tools.py`, `remote_dev.py`,
-`__init__.py`, all three mode policies and `policies/ollama.md`. Both
+`hub.py`, `__init__.py`, all three mode policies and `policies/ollama.md`. Both
 `harbor` and the old `codex-workspace` command must work outside the checkout.
 The source archive also includes docs, scripts, tests and project skills.
 
@@ -329,3 +329,8 @@ distribution and any explicit Linux PATH that avoids shell-autostart interceptio
 The other PC previously used Ubuntu-24.04 with a direct installed-package launch;
 do not replace that with a different distribution or plain Codex.
 Do not install a Windows Python/Node/Codex toolchain for this app.
+
+## Unified hub
+
+For native Codex on remote hosts, backend discovery, and extensible provider
+routing, follow [HUB.md](HUB.md). Both ends need Harbor 0.4.0+.

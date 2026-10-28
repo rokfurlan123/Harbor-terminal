@@ -376,3 +376,20 @@ The app-server protocol is experimental. `doctor` checks the installed integrati
 Detaching keeps processes running and uses RAM. Close conversation panes with `c` when finished. To stop the entire workspace after saving work, run `tmux -L codex-workspace-<instance> kill-server` (or `tmux -L codex-workspace kill-server` for legacy); this interrupts open work but retains recorded conversation history and local drafts.
 
 Project display names can be set in the workspace preferences `project_names` mapping, keyed by project folder. Names appear in Projects and are included in search.
+
+## Host/backend hub (0.4.0)
+
+Press **H** in the sidebar to choose **execution machine → backend → model**.
+Native Codex on a remote machine is supported alongside Ollama and configured
+Responses endpoints. Existing conversations keep their current machine/model.
+
+```bash
+harbor hub hosts
+harbor hub models --host laptop
+harbor hub open --host laptop --backend codex
+```
+
+See [the hub guide](docs/HUB.md) for adding machines/providers, subscription
+boundaries, authentication, installation and connection maintenance. Remote
+Codex keeps its files, tools and history on its execution host; remote Ollama
+inference can serve a workspace running elsewhere. No secrets are synchronized.

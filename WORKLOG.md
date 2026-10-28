@@ -899,3 +899,72 @@ must not be silently moved or restarted.
   No new model-generated end-to-end project task, web/GUI preview, actual
   network outage or Windows UI was exercised. Credentials/native approvals,
   live history and unrelated processes were not used as destructive fixtures.
+
+## 2026-10-28 — Native Codex + extensible host/backend hub (0.4.0)
+
+Request: make Harbor the hub for arbitrary numbers of execution machines and
+models/backends, including native Codex on the laptop and future subscription
+providers; preserve the principle and connection lifecycle in agent/skill docs.
+
+Implemented `hub.py` adapter registry and `harbor hub hosts|models|open`; sidebar
+**H** discovers execution host → backend → model and confirms routing. Native
+Codex discovery uses account/read and paginated model/list, without prompts,
+and native remote workspaces preserve destination login, shell, project files,
+approvals and history. Existing Ollama/SSH/Tailscale/Responses connections become
+`connection:ID` backends without duplicating profiles or storing credentials.
+Remote workers expose hub protocol 1 catalogs and validate selection before
+changing scoped new-session preferences. Active panes are not restarted.
+Unknown/offline hosts, missing models and signed-out Codex fail closed. Discovery
+errors are per backend/host; catalogs/configured IDs are explicitly not inference
+or subscription-entitlement tests. `local` is reserved as the execution-host ID.
+Future provider subscriptions require supported vendor adapters/authentication,
+not an assumption that all subscriptions export a compatible API.
+
+Fixed `Rpc(standalone=True)` using removed `app-server --stdio`: default stdio
+works on both installed Codex versions and repairs `harbor doctor`.
+
+Documentation: docs/HUB.md, README.md, docs/INSTALLATION.md, project AGENTS.md,
+and `.agents/skills/harbor-hub/SKILL.md`; installed the skill under
+`~/.codex/skills/harbor-hub` on the source. Both skill copies validate. Guides
+cover installation, updates, native login, source-side tests, no secret copying,
+Tailscale/SSH recovery, protocol compatibility and reconnect semantics.
+
+Deployment: Harbor 0.4.0 wheel installed on both Linux machines. Source uses
+`~/.local/share/pipx/venvs/harbor`, Python 3.12.3, Codex 0.165.0, tmux 3.4.
+Laptop uses existing dedicated `~/.local/share/harbor-app/venv`, Python 3.12.3,
+Codex 0.163.0, tmux 3.4. Laptop has no pipx/pip/ensurepip: first two install attempts
+failed without changing its old package; installation then succeeded using the
+official temporary pip zipapp (pip 26.2.2 at
+`/tmp/harbor-hub-install-6amyro95/pip.pyz`) with the existing venv interpreter,
+`--no-deps --force-reinstall`. No Windows tooling, credential transfer, ACL
+changes, public listeners or sudo were used. Routine application update applied.
+
+Packaging: built sdist then wheel with `.venv/bin/python -m build`. A wheel-only
+build over the old rename cache contained stale codex_workspace modules;
+rebuilding via sdist produces a clean Harbor-only wheel. Verified final runtime
+modules match source, package includes hub.py and mode policies, no legacy
+codex_workspace/ tree. Build isolation used setuptools 84.2.1.
+
+Verification:
+- Full suite: **126 tests passed**, 35.174 s, including 13 new hub tests for
+  pagination/auth/cleanup, 50-host persistence, failure isolation, routing,
+  shell quoting, scoped selection, UI cancellation and no local fallback.
+- Installed-package isolated smoke (temporary CODEX_HOME/DATA/BASE_DATA/projects
+  and unique tmux socket): signed-out catalog/refusal, sidebar H prompt/cancel,
+  no pane interruption and no model turn. First key was sent during startup
+  refresh and ignored by existing busy-state handling; waiting for readiness
+  passed. Only test-owned tmux server was stopped.
+- Source → laptop live discovery returns signed-in Codex catalog plus local
+  Ollama models, no backend errors. `harbor doctor` succeeds on both ends.
+- `harbor hub open --host laptop --backend codex --detached` succeeds and leaves
+  the requested workspace ready at instance `r-08d6123ed1bc` on the laptop.
+  Reconnect from source: `harbor hub open --host laptop --backend codex`.
+- Existing source → laptop Ollama connection still passes, listing
+  local-qwen:latest and qwen3:8b.
+- `git diff --check` and skill validation pass. Review was implementation-aware,
+  not an independent/blind agent review. No paid inference turn was sent; model
+  entitlement, response quality, and future vendor adapters remain unverified.
+
+Open a fresh local Harbor window for H; existing sidebar processes retain loaded
+code and existing conversation terminals keep their loaded settings. Remote
+sessions remain host-owned, not merged/copied into the source's conversation DB.

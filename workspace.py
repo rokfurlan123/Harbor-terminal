@@ -25,9 +25,9 @@ import getpass
 from contextlib import contextmanager
 
 if __package__:
-    from . import connections, local_runtime, remote_dev
+    from . import connections, local_runtime, remote_dev, hub
 else:
-    import connections, local_runtime, remote_dev
+    import connections, local_runtime, remote_dev, hub
 
 # Honor Harbor names while keeping existing installations and child processes compatible.
 for _setting in ("DATA", "SOCKET", "BASE_DATA", "INSTANCE", "CODEX", "PROJECTS_ROOT"):
@@ -302,7 +302,7 @@ class Rpc:
     def __init__(self, standalone=False):
         DATA.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.log = (DATA / "app-server.log").open("a")
-        args = [CODEX, "app-server", "--stdio"] if standalone else [
+        args = [CODEX, "app-server"] if standalone else [
             sys.executable, str(ROOT / "workspace.py"), "proxy", str(DATA / "server.sock")]
         self.process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=self.log, text=True, bufsize=1)
@@ -1138,8 +1138,49 @@ class Sidebar:
         self.put(h - 4, "/ Search      r Refresh")
         self.put(h - 3, "D Delete      q Detach")
         self.put(h - 2, "Right-click: menu / copy", curses.A_DIM)
-        self.put(h - 1, "R Remote dev · C Connections", curses.A_DIM)
+        self.put(h - 1, "H Hub · R Remote · C Connections", curses.A_DIM)
         self.screen.refresh()
+
+    def open_hub(self):
+        host = self.prompt("Execution host: " + ", ".join(p['id'] for p in hub.hosts(sys.modules[__name__])), 'local')
+        if not host:
+            return
+        def loaded(report):
+            self.screen.timeout(-1)
+            try:
+                ids = [b['id'] for b in report['backends']]
+                if not ids:
+                    self.message = 'No backends available: ' + json.dumps(report.get('errors', []))
+                    return
+                backend = self.prompt('Backend: ' + ', '.join(ids), 'codex' if 'codex' in ids else ids[0])
+                if not backend:
+                    return
+                found = next((b for b in report['backends'] if b['id'] == backend), None)
+                if not found:
+                    raise ValueError('Choose a listed backend.')
+                model = self.choose_model({}, ([{'model': m} for m in found['models']], 'Execution: ' + host + ' / ' + backend))
+                if model is None:
+                    return
+                selected_model = hub.selection(report, backend, model['model'])
+                project = self.prompt('Remote project folder [blank: workspace]') if host != 'local' else ''
+                if project is None:
+                    return
+                if not self.confirm('Open ' + backend + ' on ' + host + '? Files and tools run there; existing panes stay unchanged.'):
+                    return
+                if host == 'local':
+                    save_preferences(new_session_model=selected_model)
+                    self.message = 'New sessions: ' + model_label(selected_model) + '; execution stays here.'
+                    return
+                args = ['hub', 'open', '--host', host, '--backend', backend, '--model', model['model']]
+                if project:
+                    args += ['--project', project]
+                launch = command(*args) + '; result=$?; if [ "$result" -ne 0 ]; then printf "\\nHub launch failed. Press Enter to return."; read -r answer; fi; exit "$result"'
+                result = subprocess.run(['tmux', '-L', SOCKET, 'display-popup', '-E', '-w', '100%', '-h', '100%',
+                                         '-T', 'Harbor hub: ' + host, shlex.join(['sh', '-c', launch])])
+                self.message = 'Returned from hub; sessions stay on ' + host if result.returncode == 0 else 'Hub failed; no fallback. H reconnects.'
+            finally:
+                self.screen.timeout(200)
+        self.submit(lambda: hub.catalog(sys.modules[__name__], host), loaded, 'Discovering backends on ' + host + '…')
 
     def remote_development(self):
         store = remote_dev.Store(os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA)))
@@ -1223,6 +1264,8 @@ class Sidebar:
                 self.message = "Select a conversation first"
         elif self.future:
             return
+        elif key == "H":
+            self.open_hub()
         elif key == "R":
             self.remote_development()
         elif key == "C":
@@ -1402,6 +1445,7 @@ def welcome():
     print("  Your conversations, together in one terminal.\n")
     if os.environ.get("CODEX_WORKSPACE_REMOTE_HOST"):
         print("  REMOTE DEVELOPMENT: " + os.environ["CODEX_WORKSPACE_REMOTE_HOST"] + " — files, commands and tests run here.\n")
+    print("  Sidebar H opens the host/backend hub.\n")
     print("  Sidebar R opens Remote development; existing local sessions stay local.\n")
     print("  Click a conversation on the right, or press F6 to select one.")
     print("  Click Start blank session, or press F6 then b, to start immediately.")
@@ -1727,13 +1771,15 @@ def model_cli(argv):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "hub":
+        return hub.cli(sys.argv[2:], sys.modules[__name__])
     if len(sys.argv) > 1 and sys.argv[1] == "remote":
         return remote_dev.cli(sys.argv[2:], os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA)))
     if len(sys.argv) > 1 and sys.argv[1] == "remote-worker":
         return remote_dev.worker(sys.argv[2:], sys.modules[__name__])
     if len(sys.argv) > 1 and sys.argv[1] in ("connections", "models"):
         return model_cli(sys.argv[1:])
-    parser = argparse.ArgumentParser(prog="harbor", description=__doc__, epilog="Remote development: harbor remote --help. Model connections: harbor connections --help.")
+    parser = argparse.ArgumentParser(prog="harbor", description=__doc__, epilog="Hub: harbor hub --help. Remote development: harbor remote --help. Model connections: harbor connections --help.")
     parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "model-picker", "doctor"], default="start")
     parser.add_argument("arguments", nargs="*")
     parser.add_argument("--remote", help="Run the whole workspace on a saved remote development host")

@@ -24,6 +24,8 @@ def validate(profile):
         raise ValueError('Unsupported development host fields; do not store credentials.')
     if not re.fullmatch(r'[a-z][a-z0-9_-]{0,39}', p.get('id', '')):
         raise ValueError('Host ID must start with a lowercase letter; use letters, digits, - or _.')
+    if p['id'] == 'local':
+        raise ValueError('local is reserved for this computer in the Harbor hub; choose another host ID.')
     if p.get('kind') not in ('tailscale', 'ssh'):
         raise ValueError('Development transport must be tailscale or ssh.')
     if not re.fullmatch(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*', p.get('ssh', '')):
@@ -115,9 +117,9 @@ def ssh_command(profile, args, interactive=False):
     return ['ssh', *options, p['ssh'], remote]
 
 
-def check(profile):
-    result = subprocess.run(ssh_command(profile, ['check', '--root', profile['root']]),
-                            capture_output=True, text=True, timeout=30)
+def request(profile, args, timeout=30):
+    result = subprocess.run(ssh_command(profile, args),
+                            capture_output=True, text=True, timeout=timeout)
     if result.returncode:
         raise RuntimeError('Remote development check failed (no local fallback): ' +
                            (result.stderr or result.stdout).strip()[-2000:])
@@ -130,12 +132,20 @@ def check(profile):
         raise RuntimeError('Destination needs a compatible Harbor update (remote development protocol 1).') from None
 
 
-def open_remote(profile, project=None, repo=None, instance=None, detached=False):
+def check(profile):
+    return request(profile, ['check', '--root', profile['root']])
+
+
+def open_remote(profile, project=None, repo=None, instance=None, detached=False, backend=None, model=None):
     check(profile)
     args = ['open', '--root', profile['root'], '--label', profile['id']]
     for flag, value in (('--project', project), ('--repo', repo), ('--instance', instance)):
         if value:
             args += [flag, value]
+    if backend:
+        args += ['--backend', backend]
+    if model:
+        args += ['--model', model]
     if detached:
         args.append('--detached')
     elif not sys.stdin.isatty():
@@ -248,13 +258,15 @@ def project_directory(root, project=None, repo=None):
 
 def worker(argv, app):
     parser = argparse.ArgumentParser(prog='harbor remote-worker')
-    parser.add_argument('action', choices=['check', 'open'])
+    parser.add_argument('action', choices=['check', 'catalog', 'open'])
     parser.add_argument('--root', required=True)
     parser.add_argument('--label', default='remote')
     parser.add_argument('--project')
     parser.add_argument('--repo')
     parser.add_argument('--instance')
     parser.add_argument('--detached', action='store_true')
+    parser.add_argument('--backend')
+    parser.add_argument('--model')
     args = parser.parse_args(argv)
     if not sys.platform.startswith('linux'):
         raise ValueError('Remote development requires Linux/WSL.')
@@ -265,6 +277,9 @@ def worker(argv, app):
     for tool in ('git', 'tmux', app.CODEX):
         if not shutil.which(tool):
             raise ValueError('Missing remote Linux tool: ' + tool)
+    if args.action == 'catalog':
+        print(json.dumps(dict(app.hub.local_catalog(app), hub_protocol=1)))
+        return
     if args.action == 'check':
         version = subprocess.run([app.CODEX, '--version'], capture_output=True, text=True, timeout=10, check=True)
         login = subprocess.run([app.CODEX, 'login', 'status'], capture_output=True, text=True, timeout=10)
@@ -272,6 +287,9 @@ def worker(argv, app):
                           'codex': version.stdout.strip(), 'signed_in': login.returncode == 0,
                           'github_cli': bool(shutil.which('gh'))}))
         return
+    selected = None
+    if args.backend:
+        selected = app.hub.selection(app.hub.local_catalog(app), args.backend, args.model)
     dest = project_directory(root, args.project, args.repo)
     root.mkdir(parents=True, exist_ok=True)
     name = args.instance or 'r-' + hashlib.sha256((args.label+str(root)).encode()).hexdigest()[:12]
@@ -279,6 +297,8 @@ def worker(argv, app):
     os.environ['CODEX_WORKSPACE_REMOTE_ROOT'] = str(root)
     os.environ['CODEX_WORKSPACE_PROJECTS_ROOT'] = str(root)
     app.select_instance(name)
+    if selected is not None:
+        app.save_preferences(new_session_model=selected)
     app.initialize_projects()
     if dest:
         projects = list(app.preferences().get('projects', []))
