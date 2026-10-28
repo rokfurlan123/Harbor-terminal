@@ -25,9 +25,9 @@ import getpass
 from contextlib import contextmanager
 
 if __package__:
-    from . import connections, local_runtime
+    from . import connections, local_runtime, remote_dev
 else:
-    import connections, local_runtime
+    import connections, local_runtime, remote_dev
 
 # Honor Harbor names while keeping existing installations and child processes compatible.
 for _setting in ("DATA", "SOCKET", "BASE_DATA", "INSTANCE", "CODEX", "PROJECTS_ROOT"):
@@ -260,7 +260,7 @@ def mode_transform(mode, baseline="", model=None):
         if existing is None:
             existing = (params.get("config") or {}).get("developer_instructions", baseline)
         existing = (existing or "").split(LEGACY_MODE_MARKER, 1)[0].split(MODE_MARKER, 1)[0]
-        params["developerInstructions"] = existing + MODE_MARKER + instruction + local_runtime.facts(model)
+        params["developerInstructions"] = existing + MODE_MARKER + instruction + local_runtime.facts(model) + remote_dev.facts()
         if model:
             params["model"] = model["model"]
             params["modelProvider"] = model["provider"]
@@ -592,7 +592,7 @@ def configure_toolbar():
     tmux("set-option", "-t", SESSION, "status-style", "bg=colour235,fg=white")
     # Explicit ranges survive styling and exclude the hidden child-window list.
     tmux("set-option", "-t", SESSION, "status-format[0]",
-         "#[align=left,bold] HARBOR #[nobold] | #[reverse,range=left] Model: #{@harbor_model} v "
+         "#[align=left,bold] HARBOR " + ("REMOTE " + os.environ["CODEX_WORKSPACE_REMOTE_HOST"] + " " if os.environ.get("CODEX_WORKSPACE_REMOTE_HOST") else "") + "#[nobold] | #[reverse,range=left] Model: #{@harbor_model} v "
          "#[noreverse,norange,align=right] F5 Model | F6 Sessions ")
     popup = ("display-popup", "-E", "-t", SESSION + ":", "-x", "C", "-y", "C",
              "-w", "80%", "-h", "80%", "-T",
@@ -652,7 +652,7 @@ def model_picker(screen):
         model = side.choose_model(active_child_model(side.workspace), available_models(rpc))
         if model is not None:
             open_model_child(side.workspace, rpc, model)
-    except (RuntimeError, OSError, ValueError, curses.error) as exc:
+    except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, curses.error) as exc:
         screen.erase()
         side.put(0, "Could not open model: " + str(exc))
         side.put(2, "Press any key to close")
@@ -1072,7 +1072,7 @@ class Sidebar:
     def draw(self):
         self.screen.erase()
         h, w = self.screen.getmaxyx()
-        self.put(0, "HARBOR" + (" · ARCHIVED" if self.archived else ""), curses.A_BOLD | curses.color_pair(1))
+        self.put(0, "HARBOR" + (" · REMOTE " + os.environ["CODEX_WORKSPACE_REMOTE_HOST"] if os.environ.get("CODEX_WORKSPACE_REMOTE_HOST") else "") + (" · ARCHIVED" if self.archived else ""), curses.A_BOLD | curses.color_pair(1))
         self.put(1, "M Model: " + model_label(preferences().get("new_session_model", {})), curses.A_DIM)
         self.put(2, "/ " + (self.query or "Search conversations"), curses.A_DIM)
         self.put(3, "b  Start blank session", curses.A_BOLD | curses.color_pair(1))
@@ -1138,8 +1138,37 @@ class Sidebar:
         self.put(h - 4, "/ Search      r Refresh")
         self.put(h - 3, "D Delete      q Detach")
         self.put(h - 2, "Right-click: menu / copy", curses.A_DIM)
-        self.put(h - 1, "C Connections · F6/F3 focus", curses.A_DIM)
+        self.put(h - 1, "R Remote dev · C Connections", curses.A_DIM)
         self.screen.refresh()
+
+    def remote_development(self):
+        store = remote_dev.Store(os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA)))
+        hosts = store.all()
+        if not hosts:
+            self.message = "Setup: harbor remote setup laptop --host HOST --user USER"
+            return
+        name = self.prompt("Remote development host: " + ", ".join(p["id"] for p in hosts), hosts[0]["id"])
+        if not name:
+            return
+        store.get(name)
+        project = self.prompt("Remote project folder (blank: workspace)")
+        if project is None:
+            return
+        repo = self.prompt("Git URL or owner/repo (blank: existing project)")
+        if repo is None:
+            return
+        args = ["remote", "open", name]
+        if project:
+            args += ["--project", project]
+        if repo:
+            args += ["--repo", repo]
+        # This popup has its own PTY. Local conversations are not replaced.
+        # Attaching must not inherit run()'s 30-second command timeout.
+        launch = command(*args) + '; result=$?; if [ "$result" -ne 0 ]; then printf "\\nRemote launch failed. Press Enter to return to local Harbor."; read -r answer; fi; exit "$result"'
+        result = subprocess.run(["tmux", "-L", SOCKET, "display-popup", "-E", "-w", "100%", "-h", "100%",
+                                 "-T", "Remote development: " + name, shlex.join(["sh", "-c", launch])])
+        self.message = ("Returned to local Harbor; remote sessions remain on " + name if result.returncode == 0
+                        else "Remote launch failed/disconnected; no local fallback. Press R to reconnect.")
 
     def action(self, key):
         selected = self.selected()
@@ -1194,6 +1223,8 @@ class Sidebar:
                 self.message = "Select a conversation first"
         elif self.future:
             return
+        elif key == "R":
+            self.remote_development()
         elif key == "C":
             self.manage_connections()
         elif key in ("M", "model:default"):
@@ -1356,7 +1387,7 @@ class Sidebar:
                     # Prompts need blocking reads; refresh resumes when they close.
                     self.screen.timeout(-1)
                     self.action(key)
-                except (RuntimeError, OSError, ValueError, curses.error) as exc:
+                except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, curses.error) as exc:
                     self.message = str(exc)
                 finally:
                     self.screen.timeout(200)
@@ -1369,6 +1400,9 @@ class Sidebar:
 def welcome():
     print("\033[2J\033[H\n  HARBOR\n")
     print("  Your conversations, together in one terminal.\n")
+    if os.environ.get("CODEX_WORKSPACE_REMOTE_HOST"):
+        print("  REMOTE DEVELOPMENT: " + os.environ["CODEX_WORKSPACE_REMOTE_HOST"] + " — files, commands and tests run here.\n")
+    print("  Sidebar R opens Remote development; existing local sessions stay local.\n")
     print("  Click a conversation on the right, or press F6 to select one.")
     print("  Click Start blank session, or press F6 then b, to start immediately.")
     print("  Press n to create a session: Auto, Conversation, or Project work.")
@@ -1585,7 +1619,7 @@ def start(detached=False):
             raise
     # Set a stable outer terminal tab title, including when reattaching to an
     # older workspace. Do not let native conversation pane titles replace it.
-    tmux("set-option", "-t", SESSION, "set-titles-string", "Harbor")
+    tmux("set-option", "-t", SESSION, "set-titles-string", "Harbor" + (" — REMOTE " + os.environ["CODEX_WORKSPACE_REMOTE_HOST"] if os.environ.get("CODEX_WORKSPACE_REMOTE_HOST") else ""))
     tmux("set-option", "-t", SESSION, "set-titles", "on")
     Workspace().repair()
     configure_mouse()
@@ -1693,14 +1727,24 @@ def model_cli(argv):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "remote":
+        return remote_dev.cli(sys.argv[2:], os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA)))
+    if len(sys.argv) > 1 and sys.argv[1] == "remote-worker":
+        return remote_dev.worker(sys.argv[2:], sys.modules[__name__])
     if len(sys.argv) > 1 and sys.argv[1] in ("connections", "models"):
         return model_cli(sys.argv[1:])
-    parser = argparse.ArgumentParser(prog="harbor", description=__doc__)
+    parser = argparse.ArgumentParser(prog="harbor", description=__doc__, epilog="Remote development: harbor remote --help. Model connections: harbor connections --help.")
     parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "model-picker", "doctor"], default="start")
     parser.add_argument("arguments", nargs="*")
+    parser.add_argument("--remote", help="Run the whole workspace on a saved remote development host")
     parser.add_argument("--detached", action="store_true", help="Start in the background without attaching")
     parser.add_argument("--instance", help="Open or reconnect to a named workspace (legacy reconnects to the original)")
     args = parser.parse_args()
+    if args.remote:
+        if args.mode != "start" or args.arguments:
+            raise ValueError("--remote is only valid for workspace startup.")
+        store = remote_dev.Store(os.environ.get("CODEX_WORKSPACE_BASE_DATA", str(DATA)))
+        return remote_dev.open_remote(store.get(args.remote), instance=args.instance, detached=args.detached)
     if args.mode == "start":
         select_instance(args.instance)
         start(args.detached)
@@ -1752,7 +1796,7 @@ def main():
 def cli():
     try:
         main()
-    except (RuntimeError, OSError, ValueError) as exc:
+    except (RuntimeError, OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f"harbor: {exc}", file=sys.stderr)
         sys.exit(1)
 

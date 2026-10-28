@@ -2,6 +2,25 @@
 
 A Linux/WSL AI workspace with local and remote model connections, the real Codex conversation on the left and a Trivia / Projects session tree on the right. Uses your installed Codex, its existing login, and its own session storage. The app uses Python's standard library; external model providers use their own authentication.
 
+## Remote development on the laptop (0.3.0)
+
+Press **F6 → R (Remote dev)** to open a saved remote development host, or run:
+
+```bash
+harbor remote setup laptop --host strawberry-laptop --user rokdbest
+harbor --remote laptop
+# Clone/open a project on the laptop, not this computer:
+harbor remote open laptop --repo owner/project
+```
+
+This runs the **whole Harbor/Codex workspace on the laptop**: files, Git,
+dependencies, shell commands, builds and tests. It is separate from remote model
+inference. Look for **REMOTE laptop**; F4 returns to local Harbor. Existing
+conversations stay local, remote sessions survive detachment, and failure never
+falls back to local execution. Both computers need Harbor 0.3.0+; the laptop
+uses its own signed-in Codex and Git credentials. See
+[remote development setup and boundaries](docs/REMOTE_DEVELOPMENT.md).
+
 ## Install on another computer (Linux/WSL)
 
 AI agents: follow [installation and maintenance instructions](docs/INSTALLATION.md)

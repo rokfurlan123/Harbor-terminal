@@ -17,3 +17,8 @@ connections.tmp
 build/
 dist/
 *.egg-info/
+
+# Remote development connection metadata
+development-hosts.json
+development-hosts.lock
+development-hosts.tmp

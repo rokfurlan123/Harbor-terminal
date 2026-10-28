@@ -128,9 +128,17 @@ Use `--detached`, inspect only the test tmux panes, and stop only the test socke
 Never use live conversations as fixtures. Model inference tests require task
 scope that authorizes model execution; ordinary package checks need no prompts.
 
+## Develop on another computer
+
+For execution of projects, shell commands, builds and tests on the laptop—not
+only remote model inference—use [REMOTE_DEVELOPMENT.md](REMOTE_DEVELOPMENT.md).
+Install the current Harbor package on both ends. The destination keeps its own
+Codex sign-in, Git authentication, history and approval settings. Do not copy
+client credentials to enable it. No Windows toolchain is installed.
+
 ## Connect the PC to Qwen on the laptop
 
-The model host is **strawberry-laptop-linux**, Tailscale IP **100.124.226.26**.
+The model host is **strawberry-laptop**, Tailscale IP **100.124.226.26**.
 The laptop's local Ollama endpoint is **127.0.0.1:11434**. Harbor forwards that
 endpoint over authenticated SSH. It does not disable authentication or publish
 Ollama, and it does not need the separate Local AI web-app access key.
@@ -146,7 +154,7 @@ On the PC, use Harbor’s guided Tailscale setup (Harbor 0.2.1+):
 
 ```bash
 harbor connections devices
-harbor connections setup laptop --host strawberry-laptop-linux --user rokdbest --model local-qwen
+harbor connections setup laptop --host strawberry-laptop --user rokdbest --model local-qwen
 harbor connections test laptop
 harbor models list --connection laptop
 harbor
@@ -294,7 +302,7 @@ instances in the machine's base data directory; no credentials are synced.
 ## Package and Windows shortcut maintenance
 
 The wheel must include the `harbor` package's `workspace.py`, `connections.py`,
-`bridge.py`, `transport.py`, `tailscale_support.py`, `local_runtime.py`, `web_tools.py`,
+`bridge.py`, `transport.py`, `tailscale_support.py`, `local_runtime.py`, `web_tools.py`, `remote_dev.py`,
 `__init__.py`, all three mode policies and `policies/ollama.md`. Both
 `harbor` and the old `codex-workspace` command must work outside the checkout.
 The source archive also includes docs, scripts, tests and project skills.

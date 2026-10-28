@@ -12,7 +12,7 @@ In the sidebar press **C**, then **s Setup Tailscale**:
 | Value | Example | Meaning |
 | --- | --- | --- |
 | Connection name | laptop | A name used in Harbor’s model picker |
-| Computer | strawberry-laptop-linux | Tailscale name, full DNS name, or IP |
+| Computer | strawberry-laptop | Tailscale name, full DNS name, or IP |
 | Linux username | rokdbest | Account on the model computer |
 | Remote port | 11434 | Model API on that computer’s loopback interface |
 | Model (optional) | local-qwen | Select for new sessions after verification |
@@ -27,7 +27,7 @@ The terminal supports the same operation:
 harbor connections devices
 harbor connections setup
 # Or provide the fields directly:
-harbor connections setup laptop --host strawberry-laptop-linux --user rokdbest --model local-qwen
+harbor connections setup laptop --host strawberry-laptop --user rokdbest --model local-qwen
 harbor connections test laptop
 harbor models list --connection laptop
 ```
@@ -131,6 +131,11 @@ conversations as test fixtures. Preserve running conversation panes during app
 updates; a new workspace or a support-sidebar reload exposes the new wizard.
 
 The known deployment is **strawberry (100.89.111.39) →
-strawberry-laptop-linux (100.124.226.26) → loopback Ollama 11434**. This workflow
+strawberry-laptop (100.124.226.26) → loopback Ollama 11434**. This workflow
 also works for another permitted Linux Tailscale peer and any model its Ollama
 catalog reports. It does not require the separate chat website or its access key.
+
+## Remote execution is a separate option
+
+The model connector described above keeps file tools on the client. To develop,
+build and test entirely on the laptop, use [REMOTE_DEVELOPMENT.md](REMOTE_DEVELOPMENT.md).

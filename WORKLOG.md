@@ -811,3 +811,91 @@ connection profile, model default, or conversation changes were necessary.
 - Focused discovery checks suffice: no application behavior changed. README's
   existing automatic-discovery instructions remain accurate. No Windows or
   protected private-directory access occurred.
+
+## 2026-10-28 — Whole-workspace remote development on Strawberry laptop (0.3.0)
+
+User requested an option to keep Harbor's display here while project checkout,
+commands, tools, builds, tests and development execute on the laptop. This is
+separate from the existing remote-inference connector. Existing conversations
+must not be silently moved or restarted.
+
+- Implemented `remote_dev.py`, private development-host profiles (separate from
+  model connections), `harbor remote setup/list/test/open/remove`, and
+  `harbor --remote HOST`. Setup verifies authenticated transport, destination
+  Harbor protocol/tools and Codex login status without submitting a prompt;
+  only successful verification saves a profile. Replacement is explicit.
+- Sidebar **F6 → R Remote dev** opens a full-size remote workspace popup and
+  preserves local panes. Cancellation saves/opens nothing; failed launches keep
+  the error visible until Enter instead of immediately disappearing. Remote
+  headers, top bar and terminal title identify the execution host. F4 detaches.
+- The destination runs its own installed Harbor and Codex, with its own sign-in,
+  native approvals, shell, filesystem, histories and model selection. Only the
+  display crosses SSH. No client credentials, SSH agent, project directories,
+  environment or local conversation history are copied. A remote execution
+  instruction tells project agents to find/clone the intended repository there,
+  follow AGENTS.md and use remote tests. Discussion stays discussion; ambiguous
+  repository identification still needs clarification.
+- Explicit `--repo owner/repo` or Git URL clones only on the destination and only
+  if absent. Existing matching roots and dirty work are retained without pull,
+  reset or branch changes. Mismatching origins, ordinary subfolders of a parent
+  repository, traversal, Windows roots, project symlinks, credential-bearing
+  URLs and non-HTTPS/SSH Git transports are rejected. No silent local fallback.
+- Reconnect uses a stable remote-owned tmux instance; unused project sessions
+  are reused instead of accumulating empty saved entries. Remote jobs can
+  survive detachment/lost SSH while the laptop/WSL remains running. Existing
+  local chats are not transferred. Automatic app/GUI viewing, port publication
+  and .NET/Windows development are not added.
+- The user removed the obsolete Windows Tailscale entry in the admin console.
+  Renamed Linux's Tailscale name to exactly **strawberry-laptop**, IP
+  **100.124.226.26**, with no suffix. Its OS hostname still reports
+  `strawberry-laptop-linux`; that is not a second Tailscale device. Updated
+  current setup documentation to the new Tailscale name.
+- Performed implementation, builds and the full regression suite in
+  `/home/rokdbest/codex-workspace` **on the laptop over SSH**. Fast-forwarded its
+  clean main checkout from 0252ed6 to the existing origin/main 768d1e4 first.
+  Python 3.12.3 (`/usr/bin/python3`), tmux 3.4, Git `/usr/bin/git`, Codex CLI
+  0.163.0 (`~/.nvm/versions/node/v24.16.0/bin/codex`) and destination GitHub CLI
+  were verified; destination Codex was already signed in using ChatGPT.
+- Build environment is laptop `codex-workspace/.venv`. System ensurepip is
+  unavailable, so used the existing Linux pip's `--python .venv/bin/python`
+  installation route without sudo. Build 1.6.1, setuptools 84.2.1, packaging
+  26.3 and pyproject_hooks 1.3.3 installed there. Built wheel and sdist using
+  `.venv/bin/python -m build --no-isolation`. Wheel includes remote_dev.py and
+  all runtime modules/policies (18 archive entries). No Windows tools used.
+- **113 tests pass** on the laptop, including 10 new remote-development tests:
+  profile persistence/permissions/replacement/corruption, failed setup, offline
+  transport/no local execution, host-key and agent-forwarding flags, shell
+  quoting, remote-only open, clone/reuse/collision/parent-repository handling,
+  cancellation/failure UI, stable instance identity and preserved approvals /
+  developer instructions. Final suite: 27.429 seconds; log is
+  `/tmp/harbor-remote-tests-final.log` on laptop. `git diff --check` passes.
+- Source-PC → laptop acceptance used the real authenticated Tailscale connector
+  and installed packages, with explicit isolated **remote** CODEX_HOME/data/root
+  under `/tmp/harbor-remote-e2e-5zQVpH`. Successfully cloned this private GitHub
+  repository as `projects/harbor-smoke`, opened the native remote terminal,
+  reconnected repeatedly, and retained the same four remote pane IDs/PIDs
+  (%3 project, %2 sidebar, %1 service, %0 home). A dirty marker survived the final
+  reconnect. An attached 140×40 SSH terminal displayed REMOTE laptop in the
+  sidebar/top bar/title; F4 detached successfully with exit 0. Native onboarding
+  appeared under the empty isolated Codex home, as expected. No authentication
+  was copied and no model prompts were sent. Stopped only the unique test socket
+  `codex-workspace-remote-e2e`; left temporary evidence in /tmp.
+- The first acceptance launch failed because the test's CODEX_HOME directory
+  did not exist; created the isolated directory and reran successfully. This
+  was fixture setup, not an authentication/transport workaround. Development
+  review also found/fixed disappearing popup errors and the parent-repository
+  false-match risk; targeted and full checks passed afterward.
+- Installed the wheel into a separate destination `/tmp/.../package-env` without
+  dependencies and verified both command aliases/help from outside the checkout.
+  Upgraded destination's existing `~/.local/share/harbor-app/venv` in place and
+  source PC's existing pipx Harbor installation; existing conversation panes
+  were not restarted. Configured source-PC profile **laptop →
+  rokdbest@strawberry-laptop**, root `~/projects`; real installed setup/test
+  reports protocol 1, Codex present, signed_in true and GitHub CLI available.
+- Test/review work was implementation-aware by the same agent, **not independent
+  black-box review**; no subagents were launched. The R popup is covered by
+  cancellation/command/failure unit tests; attached real SSH/tmux behavior was
+  exercised directly, not by manipulating a live local Harbor conversation.
+  No new model-generated end-to-end project task, web/GUI preview, actual
+  network outage or Windows UI was exercised. Credentials/native approvals,
+  live history and unrelated processes were not used as destructive fixtures.
