@@ -8,6 +8,28 @@ import workspace as app
 
 
 class ModeTests(unittest.TestCase):
+    def test_configured_launch_defaults_override_saved_settings_on_start_and_resume(self):
+        config = {'model_reasoning_effort': 'medium', 'sandbox_mode': 'danger-full-access',
+                  'approval_policy': 'never', 'unrelated': 'not forwarded'}
+        defaults = app.native_launch_config(config)
+        self.assertNotIn('unrelated', defaults)
+        args = app.native_launch_args(defaults)
+        self.assertIn('model_reasoning_effort="medium"', args)
+        self.assertIn('sandbox_mode="danger-full-access"', args)
+        self.assertIn('approval_policy="never"', args)
+        for method in ('thread/start', 'thread/resume'):
+            request = {'method': method, 'params': {'sandbox': 'workspace-write',
+                       'approvalPolicy': 'on-request', 'config': {'keep': True,
+                       'model_reasoning_effort': 'high'}}}
+            params = app.mode_transform('auto', model={'model': 'chosen-model',
+                'provider': 'openai'}, launch_config=defaults)(request)['params']
+            self.assertEqual(params['model'], 'chosen-model')
+            self.assertEqual(params['sandbox'], 'danger-full-access')
+            self.assertEqual(params['approvalPolicy'], 'never')
+            self.assertEqual(params['config']['model_reasoning_effort'], 'medium')
+            self.assertTrue(params['config']['keep'])
+        self.assertEqual(app.native_launch_config({'sandbox_mode': None}), {})
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

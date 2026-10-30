@@ -33,6 +33,28 @@ for setup, updates, missing-sidebar diagnosis, and package verification.
 
 The complete Trivia / Projects sidebar is included in this repository and Python
 package. Install it on each computer; running plain `codex` does not launch it.
+
+### Terminal defaults
+
+Harbor uses native Codex configuration (`~/.codex/config.toml`) for the default
+model, reasoning effort, sandbox and approval policy. Explicitly configured
+reasoning/permission defaults are reapplied on both new and reopened terminals,
+so saved threads do not restore older settings. An explicitly selected Harbor
+session model still takes precedence; **M → Model for new sessions** controls
+future sessions. Running terminals are never restarted to apply defaults.
+
+For GPT-6.1 Sol / medium / Full Access, the native top-level settings are:
+
+```toml
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+```
+
+Full Access permits unsandboxed commands without approval prompts; use it only
+on a trusted execution host. Organization-enforced restrictions still apply.
+
 Requires Python 3.10+, tmux, and an installed, signed-in Codex CLI on the Linux PATH.
 Desktop launchers with a minimal PATH also discover Codex in `~/.local/bin` or
 `~/bin`. `CODEX_WORKSPACE_CODEX` overrides automatic discovery.

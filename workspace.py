@@ -248,7 +248,21 @@ def model_config(model):
     return overrides
 
 
-def mode_transform(mode, baseline="", model=None):
+def native_launch_config(config):
+    """Reapply configured defaults when a saved native thread is reopened."""
+    return {key: config[key] for key in
+            ("model_reasoning_effort", "sandbox_mode", "approval_policy")
+            if config.get(key) is not None}
+
+
+def native_launch_args(config):
+    args = []
+    for key, value in config.items():
+        args += ["-c", key + "=" + local_runtime.toml(value)]
+    return args
+
+
+def mode_transform(mode, baseline="", model=None, launch_config=None):
     if mode not in MODES:
         raise ValueError("Unknown workspace mode")
     instruction = (ROOT / "policies" / (mode + ".md")).read_text()
@@ -256,6 +270,11 @@ def mode_transform(mode, baseline="", model=None):
         if request.get("method") not in ("thread/start", "thread/resume"):
             return None
         params = request.setdefault("params", {})
+        if launch_config:
+            params["config"] = dict(params.get("config") or {}, **launch_config)
+            for key, field in (("sandbox_mode", "sandbox"), ("approval_policy", "approvalPolicy")):
+                if key in launch_config:
+                    params[field] = launch_config[key]
         existing = params.get("developerInstructions")
         if existing is None:
             existing = (params.get("config") or {}).get("developer_instructions", baseline)
@@ -1496,7 +1515,8 @@ def _run_conversation(tid, cwd, prepared_model=None):
     try:
         config = rpc.call("config/read", {"cwd": cwd, "includeLayers": False})["config"]
         baseline = config.get("developer_instructions", "")
-        if model.get("default"):
+        launch_config = native_launch_config(config)
+        if not model or model.get("default"):
             default_model = config.get("model")
             if not default_model:
                 catalog = rpc.call("model/list", {})["data"]
@@ -1506,7 +1526,7 @@ def _run_conversation(tid, cwd, prepared_model=None):
             model = {"model": default_model, "provider": config.get("model_provider") or "openai"}
     finally:
         rpc.close()
-    transform = mode_transform(mode, baseline, model)
+    transform = mode_transform(mode, baseline, model, launch_config)
     if os.environ.get("TMUX_PANE"):
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@workspace_mode", mode)
         tmux("set-option", "-p", "-t", os.environ["TMUX_PANE"], "@harbor_launch_model",
@@ -1567,7 +1587,8 @@ def _run_conversation(tid, cwd, prepared_model=None):
     worker = threading.Thread(target=forward, daemon=True)
     worker.start()
     child = subprocess.Popen([CODEX, *([] if is_new else ["resume", tid]), "-C", cwd,
-                              *model_launch_args(model), "--remote", "unix://" + str(path)])
+                              *native_launch_args(launch_config), *model_launch_args(model),
+                              "--remote", "unix://" + str(path)])
     # The native TUI handles Ctrl-C itself. Closing its pane terminates both
     # processes, including when a terminal disappears during onboarding.
     signal.signal(signal.SIGINT, lambda *_: None)

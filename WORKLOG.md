@@ -990,3 +990,39 @@ sessions are not interrupted. Updated clone instructions. New private harbor
 repository is for Linux/WSL Rinf (Rust + Flutter); not a replacement install yet.
 Verification: GitHub repo identity/visibility and origin checked; documentation-only
 change, git diff --check. No runtime restart or inference.
+
+## 2026-10-30 — Consistent terminal model, reasoning and access defaults
+
+Requested: every new Harbor terminal/tab defaults to GPT-6.1 Sol, medium
+reasoning and Full Access. Native config already selected gpt-6.1-sol / medium;
+set its top-level sandbox_mode=danger-full-access and approval_policy=never at
+the user's explicit request. Reset new_session_model to OpenAI gpt-6.1-sol in
+49 local Harbor preference scopes (base plus existing instances), including
+stale Qwen defaults. No credentials, history, per-session model selections,
+remote-machine configuration or Windows files changed.
+
+Harbor now snapshots explicitly configured native reasoning/permission defaults
+for each terminal launch and sends them both to native CLI onboarding and the
+thread/start or thread/resume bridge. Empty/default session model selections
+resolve the configured native default explicitly, rather than inheriting a
+saved thread's old model. Model/provider IDs remain configuration-driven;
+explicit alternative-model selections still work. Model-specific runtime
+profiles retain their own supported overrides. Missing native settings preserve
+native behavior; no global hardcoded Full Access policy was added to Harbor.
+Running conversation processes were not restarted; reopened/new conversation
+terminals load the new code/settings. Full Access means unsandboxed commands
+without approval prompts, subject to managed host restrictions.
+
+Verification and installation:
+- Python 3.12.3; Codex CLI 0.165.0; Linux/WSL toolchains only.
+- Full isolated regression suite: 128 tests passed in 34.909 seconds, including
+  native terminal launch/reopen and new start/resume defaults regression.
+- Isolated native app-server thread/start (temporary CODEX_HOME and DATA,
+  no credentials or inference turn): actual result model=gpt-6.1-sol,
+  reasoningEffort=medium, approvalPolicy=never, sandbox.type=dangerFullAccess.
+- Build 1.6.1: sdist then clean wheel with python -m build; initial no-isolation
+  attempt lacked setuptools, sandboxed build lacked network. Approved isolated
+  build succeeded. pipx force-installed dist/harbor-0.4.0-py3-none-any.whl into
+  ~/.local/share/pipx/venvs/harbor; installed workspace.py byte-matches source.
+- Installed harbor --help and git diff --check passed. No paid inference test,
+  Windows shortcut change, remote deployment, or independent-agent review.
