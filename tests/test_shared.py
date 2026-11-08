@@ -44,7 +44,9 @@ class SharedTests(unittest.TestCase):
                         try:
                             bridge(listener, data / 'server.sock', bound.append,
                                    app.mode_transform('conversation', 'Preserve existing configuration.',
-                                                      {'provider': 'ollama', 'model': 'qwen3:8b'}))
+                                                      {'provider': 'ollama', 'model': 'qwen3:8b'},
+                                                      {'sandbox_mode': 'danger-full-access',
+                                                       'approval_policy': 'never'}))
                         except Exception as exc:
                             failures.append(exc)
                     worker = threading.Thread(target=forward)
@@ -57,6 +59,8 @@ class SharedTests(unittest.TestCase):
                                 self.assertEqual(bound[0]['id'], result['thread']['id'])
                                 self.assertEqual(result['model'], 'qwen3:8b')
                                 self.assertEqual(result['modelProvider'], 'ollama')
+                                self.assertEqual(result['sandbox']['type'], 'dangerFullAccess')
+                                self.assertEqual(result['approvalPolicy'], 'never')
                             finally:
                                 native.close()
                     finally:

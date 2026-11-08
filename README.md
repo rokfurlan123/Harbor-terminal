@@ -43,6 +43,12 @@ so saved threads do not restore older settings. An explicitly selected Harbor
 session model still takes precedence; **M → Model for new sessions** controls
 future sessions. Running terminals are never restarted to apply defaults.
 
+Reopening saved history applies permission defaults through the session service,
+not CLI permission overrides (which Codex rejects for remote resume). Here
+“remote” includes Harbor's local Unix-socket connection; it does not mean your
+conversation moved to another computer. Select a failed/dead session again to
+recover its terminal without deleting history or creating a duplicate entry.
+
 For GPT-6.1 Sol / medium / Full Access, the native top-level settings are:
 
 ```toml

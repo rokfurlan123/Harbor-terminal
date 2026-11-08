@@ -255,9 +255,14 @@ def native_launch_config(config):
             if config.get(key) is not None}
 
 
-def native_launch_args(config):
+def native_launch_args(config, *, remote_resume=False):
     args = []
     for key, value in config.items():
+        # Remote resume permissions belong to the execution host. The native
+        # TUI rejects CLI permission overrides before it sends thread/resume.
+        # mode_transform applies these defaults on the server-side request.
+        if remote_resume and key in ("sandbox_mode", "approval_policy"):
+            continue
         args += ["-c", key + "=" + local_runtime.toml(value)]
     return args
 
@@ -1587,7 +1592,8 @@ def _run_conversation(tid, cwd, prepared_model=None):
     worker = threading.Thread(target=forward, daemon=True)
     worker.start()
     child = subprocess.Popen([CODEX, *([] if is_new else ["resume", tid]), "-C", cwd,
-                              *native_launch_args(launch_config), *model_launch_args(model),
+                              *native_launch_args(launch_config, remote_resume=not is_new),
+                              *model_launch_args(model),
                               "--remote", "unix://" + str(path)])
     # The native TUI handles Ctrl-C itself. Closing its pane terminates both
     # processes, including when a terminal disappears during onboarding.

@@ -17,6 +17,8 @@ class ModeTests(unittest.TestCase):
         self.assertIn('model_reasoning_effort="medium"', args)
         self.assertIn('sandbox_mode="danger-full-access"', args)
         self.assertIn('approval_policy="never"', args)
+        resume_args = app.native_launch_args(defaults, remote_resume=True)
+        self.assertEqual(resume_args, ['-c', 'model_reasoning_effort="medium"'])
         for method in ('thread/start', 'thread/resume'):
             request = {'method': method, 'params': {'sandbox': 'workspace-write',
                        'approvalPolicy': 'on-request', 'config': {'keep': True,

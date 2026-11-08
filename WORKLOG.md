@@ -1026,3 +1026,49 @@ Verification and installation:
   ~/.local/share/pipx/venvs/harbor; installed workspace.py byte-matches source.
 - Installed harbor --help and git diff --check passed. No paid inference test,
   Windows shortcut change, remote deployment, or independent-agent review.
+
+## 2026-11-08 — Recover saved sessions rejected by native remote resume
+
+Requested: continue Pulse Metronome and other saved sessions rather than leave
+their terminal at “Pane is dead”. Captured the actual Pulse pane failure:
+`Permission overrides are not supported when resuming a remote task.` Harbor
+connects its TUI to a local app server over a Unix socket; “remote” here does
+not imply a different computer. The configured-defaults change passed sandbox
+and approval overrides to both the client CLI and the server-side bridge.
+Codex CLI 0.167.0 rejects those CLI overrides on resume before attaching.
+
+For saved remote terminals only, omit sandbox_mode/approval_policy from client
+CLI arguments. Keep the existing bridge applying execution-host defaults to
+thread/start and thread/resume. New-session onboarding, reasoning/model args,
+native authentication, approval enforcement, history and session IDs remain
+unchanged. README explains remote/local terminology and dead-pane recovery.
+
+Verification (implementation-aware, no independent agent):
+- Added an isolated recorded-history native-TUI regression with explicit Full
+  Access defaults and synthetic auth, never real credentials. It failed with
+  the exact permission error before the fix, then passed saved-history open,
+  close/reopen and same-pane crash recovery without a duplicate session.
+- Unit regression checks permission flags remain for new launches but not
+  remote resume; both server-side start/resume transforms retain defaults.
+  Real app-server bridge check confirms Full Access/never defaults on start.
+- Final full suite: **129 tests passed in 40.892 seconds**, Python 3.12.3,
+  tmux 3.4, Codex CLI 0.167.0. No paid inference turn was sent.
+- Built sdist and wheel with existing build 1.6.1. Installed wheel into a fresh
+  temporary Linux venv; both CLI aliases work outside the checkout, and the
+  saved-history/reopen/crash-recovery integration passed again (5.292 seconds).
+- Force-updated the existing pipx Harbor installation; installed workspace.py
+  byte-matches tested source (SHA256
+  `1af3e69719d394f4adb79b6837d92f002bb4249d07a5cb3176458b3a42a9c2c1`).
+  Existing package version remains 0.4.0; no dependency/toolchain update.
+- Reloaded only the live sidebar and support key bindings from the installed
+  package. Recovered Pulse in its existing dead pane, without sending a prompt
+  or stealing the visible conversation. Its actual saved Pulse 0.3.2 response
+  and native input prompt are visible again. An initial readiness probe used
+  case-sensitive model text and timed out despite successful recovery; the
+  follow-up verified actual history, input readiness and no permission error.
+  Both other running conversation PIDs and the shared service PID are unchanged.
+- No Windows files/shortcuts, other assistants, credentials, native database
+  tables, remote machines, merges or releases were changed. Work is isolated on
+  `codex/fix-remote-session-resume` in a separate worktree; the original main
+  checkout remains untouched. New normal `harbor` launches use the updated
+  installed package. Git diff whitespace check passed.

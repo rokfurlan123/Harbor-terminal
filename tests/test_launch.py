@@ -1,12 +1,91 @@
+import datetime
+import json
 import os
 from pathlib import Path
 import tempfile
 import time
 import unittest
+import uuid
 from unittest.mock import patch
 import workspace as app
 
 class LaunchTests(unittest.TestCase):
+    def test_saved_terminal_resumes_with_configured_permissions_and_recovers_dead_pane(self):
+        """Real remote TUI, isolated recorded history, no model generation."""
+        with tempfile.TemporaryDirectory(prefix='harbor-resume-') as temp:
+            home = Path(temp)
+            data = home / 'workspace'
+            name = 'harbor-resume-' + uuid.uuid4().hex[:12]
+            tid = str(uuid.uuid4())
+            now = datetime.datetime.now(datetime.timezone.utc)
+            stamp = now.isoformat().replace('+00:00', 'Z')
+            folder = home / 'sessions' / now.strftime('%Y/%m/%d')
+            folder.mkdir(parents=True)
+            path = folder / f"rollout-{now.strftime('%Y-%m-%dT%H-%M-%S')}-{tid}.jsonl"
+            message = 'SAVED_RESUME_FIXTURE'
+            rows = [
+                {'type': 'session_meta', 'payload': {'id': tid, 'timestamp': stamp,
+                    'cwd': temp, 'originator': 'codex_cli_rs', 'cli_version': '0.167.0',
+                    'source': 'cli', 'model_provider': 'openai'}},
+                {'type': 'event_msg', 'payload': {'type': 'user_message',
+                    'message': message, 'images': []}},
+                {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user',
+                    'content': [{'type': 'input_text', 'text': message}]}},
+            ]
+            path.write_text(''.join(json.dumps({'timestamp': stamp, **r}) + '\n' for r in rows))
+            (home / 'config.toml').write_text(
+                'model="gpt-6.1-sol"\nmodel_reasoning_effort="medium"\n'
+                'sandbox_mode="danger-full-access"\napproval_policy="never"\n'
+                f'[projects.{json.dumps(temp)}]\ntrust_level="trusted"\n')
+            # Synthetic auth skips onboarding without user credentials; no turn is sent.
+            (home / 'auth.json').write_text(json.dumps({'auth_mode': 'apikey',
+                'OPENAI_API_KEY': 'synthetic-fixture-only'}))
+            env = {'CODEX_HOME': temp, 'CODEX_WORKSPACE_DATA': str(data),
+                   'CODEX_WORKSPACE_SOCKET': name, 'CODEX_WORKSPACE_PROJECTS_ROOT': temp}
+            with patch.dict(os.environ, env), patch.object(app, 'DATA', data), patch.object(app, 'SOCKET', name):
+                rpc = None
+                try:
+                    app.start(detached=True)
+                    rpc = app.Rpc()
+                    thread = rpc.call('thread/resume', {'threadId': tid})['thread']
+                    manager = app.Workspace()
+
+                    def wait_for_history():
+                        deadline = time.monotonic() + 20
+                        while True:
+                            pane = manager.main()
+                            capture = app.tmux('capture-pane', '-p', '-t', pane['pane'])
+                            self.assertEqual(pane['dead'], '0', capture)
+                            self.assertNotIn('Permission overrides are not supported', capture)
+                            if message in capture:
+                                return pane['pane']
+                            self.assertLess(time.monotonic(), deadline, capture)
+                            time.sleep(.1)
+
+                    manager.open(thread)
+                    first = wait_for_history()
+                    manager.close(tid)
+                    manager.open(thread)
+                    reopened = wait_for_history()
+                    self.assertNotEqual(first, reopened)
+                    # Recover a failed terminal without duplicating its saved entry.
+                    app.tmux('respawn-pane', '-k', '-t', reopened, 'exit 7')
+                    deadline = time.monotonic() + 5
+                    while manager.main()['dead'] != '1':
+                        self.assertLess(time.monotonic(), deadline)
+                        time.sleep(.05)
+                    manager.open(thread)
+                    self.assertEqual(wait_for_history(), reopened)
+                    self.assertEqual(sum(p['thread'] == tid for p in manager.panes()), 1)
+                finally:
+                    if rpc:
+                        rpc.close()
+                    try:
+                        app.tmux('kill-server')
+                    except RuntimeError:
+                        pass
+                    time.sleep(1)
+
     def test_native_terminal_and_sidebar(self):
         with tempfile.TemporaryDirectory(prefix='workspace-launch-') as temp:
             data = Path(temp)/'workspace'
