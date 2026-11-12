@@ -25,9 +25,9 @@ import getpass
 from contextlib import contextmanager
 
 if __package__:
-    from . import connections, local_runtime, remote_dev, hub
+    from . import connections, local_runtime, remote_dev, hub, session_tools
 else:
-    import connections, local_runtime, remote_dev, hub
+    import connections, local_runtime, remote_dev, hub, session_tools
 
 # Honor Harbor names while keeping existing installations and child processes compatible.
 for _setting in ("DATA", "SOCKET", "BASE_DATA", "INSTANCE", "CODEX", "PROJECTS_ROOT"):
@@ -1516,6 +1516,7 @@ def _run_conversation(tid, cwd, prepared_model=None):
         config = rpc.call("config/read", {"cwd": cwd, "includeLayers": False})["config"]
         baseline = config.get("developer_instructions", "")
         launch_config = native_launch_config(config)
+        launch_config.update(session_tools.launch_config(DATA, SOCKET))
         if not model or model.get("default"):
             default_model = config.get("model")
             if not default_model:
@@ -1795,6 +1796,8 @@ def model_cli(argv):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "sessions":
+        return session_tools.cli(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "hub":
         return hub.cli(sys.argv[2:], sys.modules[__name__])
     if len(sys.argv) > 1 and sys.argv[1] == "remote":
@@ -1803,7 +1806,7 @@ def main():
         return remote_dev.worker(sys.argv[2:], sys.modules[__name__])
     if len(sys.argv) > 1 and sys.argv[1] in ("connections", "models"):
         return model_cli(sys.argv[1:])
-    parser = argparse.ArgumentParser(prog="harbor", description=__doc__, epilog="Hub: harbor hub --help. Remote development: harbor remote --help. Model connections: harbor connections --help.")
+    parser = argparse.ArgumentParser(prog="harbor", description=__doc__, epilog="Sessions: harbor sessions --help. Hub: harbor hub --help. Remote development: harbor remote --help. Model connections: harbor connections --help.")
     parser.add_argument("mode", nargs="?", choices=["start", "sidebar", "welcome", "server", "proxy", "run", "focus", "model-picker", "doctor"], default="start")
     parser.add_argument("arguments", nargs="*")
     parser.add_argument("--remote", help="Run the whole workspace on a saved remote development host")

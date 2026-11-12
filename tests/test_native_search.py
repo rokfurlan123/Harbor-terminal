@@ -78,6 +78,7 @@ class SearchRequestTests(unittest.TestCase):
                                              'requires_openai_auth': False, 'supports_websockets': False}}
                 calls.clear()
                 result = subprocess.run([app.CODEX, 'exec', '--skip-git-repo-check', '--json', '-C', temp,
+                                         *app.native_launch_args(app.session_tools.launch_config(home, 'unused-fixture')),
                                          *app.model_launch_args(model), 'hey'],
                                         env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=45)
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
@@ -87,6 +88,7 @@ class SearchRequestTests(unittest.TestCase):
                     self.assertGreaterEqual(len(calls), 2, result.stdout + result.stderr)
                     self.assertIn('not allowed', json.dumps(calls[-1].get('input')))
                 for request in calls:
+                    self.assertIn('harbor_sessions', json.dumps(request.get('tools')))
                     has_search = any(t.get('type', '').startswith('web_search') for t in request.get('tools', []))
                     self.assertEqual(has_search, backend == 'responses', request.get('tools'))
                     if backend == 'ollama':

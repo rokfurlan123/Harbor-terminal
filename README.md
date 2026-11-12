@@ -120,6 +120,36 @@ New instance settings live under `<data-directory>/instances/<name>/`. Each star
 
 ## Controls
 
+### Ask the assistant to open a session
+
+Harbor Terminal 0.4.1 adds the instance-scoped `harbor_sessions` tools:
+`search_threads` finds saved conversations by title/preview; `open_thread` selects
+an exact thread ID. For example: **“Open the session about Pulse metronome development.”**
+If several sessions match, the assistant should ask which one you mean.
+
+Switching reuses an open pane, or opens a closed conversation through the normal
+Codex resume path. It never sends a message, closes another pane, restores an
+archive, changes the selected model, or creates a replacement conversation.
+Archived sessions must be restored separately. Pane selection is not proof that
+backend resume or model inference succeeded. Session text is untrusted data.
+
+From a shell/tool running **inside the intended Harbor Terminal instance**:
+
+```bash
+harbor sessions search 'pulse metronome'
+harbor sessions open <exact-thread-id>
+```
+
+The commands require that instance's inherited data/socket environment and fail
+closed if it is unavailable; they do not silently start or switch workspaces.
+The MCP configuration explicitly pins the same instance even when several panes
+share an app-server. No global Codex configuration or native Codex binary changes.
+New/reopened conversation terminals get the tools after updating Harbor. Existing
+running terminals keep their loaded tool catalog and are not restarted; the CLI
+can be used immediately. This feature is for Terminal, not Harbor Native.
+
+### Keyboard and mouse
+
 | Key | Action |
 | --- | --- |
 | F2 | Native Codex warnings (with the conversation focused) |

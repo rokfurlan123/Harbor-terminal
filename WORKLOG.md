@@ -1026,3 +1026,66 @@ Verification and installation:
   ~/.local/share/pipx/venvs/harbor; installed workspace.py byte-matches source.
 - Installed harbor --help and git diff --check passed. No paid inference test,
   Windows shortcut change, remote deployment, or independent-agent review.
+
+## 2026-11-12 — Assistant-controlled session navigation (0.4.1)
+
+User requested an open/switch-session capability after the available codex_tui
+tools could list/read conversations but not select one. Identified this running
+app as Harbor Terminal, not the separate native repository. Verified the pinned
+GitHub account/repository owner with codex-owned-repo before fetching; main and
+origin/main agreed. Implemented in the separate codex/open-session-tool worktree.
+
+Added bundled session_tools.py with instance-scoped stdio MCP search_threads and
+open_thread, plus `harbor sessions search/open`. New/reopened conversation TUI
+launches and thread/start/resume overrides receive the same MCP configuration,
+with explicit DATA/SOCKET environment rather than the shared service's inherited
+scope. No global Codex configuration, Codex binary, credentials, permissions,
+model preferences or internal Codex databases were changed. Reviewed official
+OpenAI MCP documentation: https://learn.chatgpt.com/docs/extend/mcp?surface=cli.
+
+Search matches titles/previews, bounds output and labels text untrusted. Open
+accepts an exact canonical UUID and existing non-archived history only. Missing
+instances/threads and archived targets fail closed; no implicit workspace startup,
+archive restore, new conversation, message or inference. Existing live panes are
+reused; closed conversations use Harbor's established native resume path. A
+private navigation lock serializes concurrent switches. Results distinguish pane
+selection from backend resume/inference success. Other panes keep running.
+
+Validation (development-aware, not independent testing):
+- Full regression suite: **137 tests passed in 38.316 seconds**, with temporary
+  CODEX_HOME, workspace DATA and tmux sockets. Evidence:
+  /tmp/harbor-open-session-tests.log.
+- Nine focused tests cover MCP protocol/malformed arguments, explicit instance
+  scope, CLI search/open, real tmux switching and repeated-open reuse, cold-open,
+  archived/unknown/missing-instance failures and preserved pane process IDs.
+- Actual Codex 0.167.2 consumed the MCP catalog and executed open_thread against
+  isolated tmux/RPC fixtures via a local synthetic Responses provider; verified
+  actual selection and all prior pane IDs/PIDs. No external/paid inference.
+- Existing Ollama/Responses mock-provider tests verify both native catalogs
+  contain harbor_sessions without changing their respective search policies.
+- Python 3.12.3, tmux 3.4; fresh Linux build venv /tmp/harbor-session-build,
+  build 1.6.1, isolated setuptools 84.2.1. Built sdist then clean wheel; installed
+  into /tmp/harbor-session-smoke and verified CLI search/open and native startup
+  outside the checkout. git diff --check passes.
+
+Installed tested 0.4.1 wheel with pipx; installed workspace.py and session_tools.py
+SHA256 hashes match source. Since this active instance's sidebar was launched
+from the older checkout, reloaded **only its unfocused sidebar support pane**
+from the installed package and refreshed existing key/toolbar handlers. Verified
+every conversation/service/home pane ID and PID remained unchanged. Original
+checkout/main and all native-desktop code remain untouched; no unrequested merge,
+release publication, remote-host deployment or Windows writes.
+
+Read-only shortcut verification: existing Desktop Harbor.lnk targets an existing
+Windows Terminal executable, explicitly launches installed Harbor through WSL
+Ubuntu-24.04, matching this distro. Shortcut untouched; no tooling installed on
+Windows. New/reopened terminals receive the dedicated tool; already-running
+terminals retain their old tool catalog and can use the installed CLI immediately.
+
+Fulfilled original navigation request using installed code: selected the previously
+identified latest Pulse click/defaults development session, ID
+01a19c21-5500-75e1-89c4-32c47b79407c. Native Codex view became ready; exactly one
+target pane exists, every preceding pane/process (including this invoice chat)
+was preserved, and no message was sent. This verifies resume display, not a new
+model response or acoustic behavior. README/installation docs cover scope,
+ambiguity, archives and tool-catalog refresh limits.

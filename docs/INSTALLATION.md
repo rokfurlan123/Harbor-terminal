@@ -305,7 +305,7 @@ instances in the machine's base data directory; no credentials are synced.
 
 The wheel must include the `harbor` package's `workspace.py`, `connections.py`,
 `bridge.py`, `transport.py`, `tailscale_support.py`, `local_runtime.py`, `web_tools.py`, `remote_dev.py`,
-`hub.py`, `__init__.py`, all three mode policies and `policies/ollama.md`. Both
+`hub.py`, `session_tools.py`, `__init__.py`, all three mode policies and `policies/ollama.md`. Both
 `harbor` and the old `codex-workspace` command must work outside the checkout.
 The source archive also includes docs, scripts, tests and project skills.
 
@@ -320,6 +320,14 @@ connections, doctor and an isolated sidebar from outside the checkout. Keep
 build outputs, environments, keys, sessions, models and connections.json out of
 Git. See docs/WORKFLOW.md for required checks and update WORKLOG.md with evidence.
 Commit scoped changes and push to the existing intended remote.
+
+For 0.4.1 session navigation, verify `harbor sessions --help` and that the wheel
+contains `harbor/session_tools.py`. New/reopened conversation terminals receive
+the `harbor_sessions` MCP tools with an explicit per-instance environment.
+Existing terminals need not be stopped; `harbor sessions search/open` works from
+their tools/shells immediately after installing. A checkout-launched sidebar
+continues using its checkout code: reload only that support pane from the tested
+installed package if necessary, preserving the service and every conversation.
 
 The optional `scripts/create_windows_shortcut.py` now creates **Harbor.lnk**,
 launching `harbor` in the default WSL distribution. It does not remove the old
